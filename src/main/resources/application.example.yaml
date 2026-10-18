@@ -1,0 +1,40 @@
+# ============================================================
+# 君山点评 - 配置示例（脱敏模板）
+# 用法：复制本文件为 application.yaml 并填入你本地的真实密码即可运行。
+# 注意：真实 application.yaml 含数据库/Redis 密码，已被 .gitignore 忽略，不会提交到仓库。
+# ============================================================
+
+server:
+  port: 8081
+
+spring:
+  application:
+    name: junshan-dianping
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/dingping?useSSL=false&serverTimezone=UTC&characterEncoding=utf-8
+    username: ${MYSQL_USER:root}
+    # 本地真实密码请通过环境变量或本文件明文填写，切勿提交到仓库
+    password: ${MYSQL_PASSWORD:your_mysql_password}
+  redis:
+    host: 127.0.0.1
+    # 项目默认 6380；若本机只有 6379，请改为 6379，并以 --spring.redis.port=6379 启动
+    port: 6380
+    password: ${REDIS_PASSWORD:your_redis_password}
+    lettuce:
+      pool:
+        max-active: 10
+        max-idle: 10
+        min-idle: 1
+        time-between-eviction-runs: 10s
+  jackson:
+    default-property-inclusion: non_null
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  type-aliases-package: com.junshan.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+logging:
+  level:
+    com.junshan: debug
