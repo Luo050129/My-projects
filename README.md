@@ -1,3 +1,113 @@
+# 君山点评 (junshan-dianping)
+
+> 一个基于 Spring Boot + Vue 3 的本地生活 / 美食点评平台（改造自黑马点评），实现了短信登录、商户缓存、优惠券秒杀、附近商户、UV 统计、签到、关注、探店等完整业务闭环，重点运用 Redis 解决高并发与分布式场景问题。
+
+## 技术栈
+
+| 层 | 技术 |
+| --- | --- |
+| 后端 | Spring Boot 2.3.x、Spring MVC、MyBatis-Plus、Lombok、Hutool |
+| 缓存 / 中间件 | Redis 5.0+（GEO / BitMap / HyperLogLog / Stream / Redisson 分布式锁）、RabbitMQ |
+| 数据库 | MySQL 8.0（默认库名 `dingping`） |
+| 前端 | Vue 3、Vue Router 4、Vite 5 |
+| 构建 | Maven（后端）、npm（前端） |
+| 开发语言 | Java 8+（编译目标 Java 8） |
+
+## 功能模块
+
+1. **短信登录**：Redis 替代 Session 存储 Token，双层拦截器做登录校验与 Token 刷新。
+2. **商户查询缓存**：Cache Aside 模式，解决缓存穿透 / 雪崩 / 击穿。
+3. **优惠券秒杀**：Redis + Lua 做资格预检，乐观锁（CAS）防超卖，Redisson 分布式锁保证一人一单，Redis Stream / RabbitMQ 异步下单。
+4. **附近的商户**：Redis GEO 地理搜索。
+5. **UV 统计**：HyperLogLog 估算独立访客。
+6. **用户签到**：BitMap 记录每日签到与连续签到天数。
+7. **好友关注 / 共同关注**：Redis Set 求交集。
+8. **达人探店 / 点赞排行榜**：Redis ZSet 排行榜。
+
+## 项目结构
+
+```
+junshan-dianping/
+├── src/main/java/com/junshan/      # 后端源码
+│   ├── config/                     # MvcConfig(含 CORS)、配置类
+│   ├── controller/                 # REST 接口
+│   ├── service/                    # 业务逻辑
+│   ├── mapper/                     # MyBatis Mapper
+│   ├── entity/ dto/                # 实体 / 传输对象
+│   ├── interceptor/                # 登录 / 刷新 Token 拦截器
+│   ├── listener/                   # 异步消息监听
+│   └── utils/                      # RedisIdWorker 等工具
+├── src/main/resources/
+│   ├── application.yaml            # 主配置（含密码，已 gitignore）
+│   ├── application.example.yaml    # 脱敏配置模板
+│   └── db/junshan.sql              # 建库 + 种子数据（日期已合规化至 2025.10-2026.01）
+├── frontend/                       # Vue 3 前端
+│   ├── src/views/                  # 首页 / 点评列表 / 商户详情
+│   ├── src/components/             # NavBar / ShopCard / ReviewCard
+│   ├── src/api/                    # 接口封装 + 内置 mock 兜底
+│   └── public/images/              # AI 生成的图片素材
+├── pom.xml
+├── run.bat                         # Windows 一键启动
+└── README.md
+```
+
+## 快速开始
+
+### 环境要求
+
+- JDK 8 或以上（编译目标 Java 8）
+- Maven 3.6+
+- MySQL 8.0（默认库名 `dingping`）
+- Redis 5.0+，监听端口 **6380**（需支持 GEO / BitMap / HyperLogLog / Stream）
+- RabbitMQ（异步秒杀用，可选；不启动则秒杀相关接口不可用）
+- Node.js 18+
+
+### 1. 启动后端
+
+```bash
+# 1) 准备数据库：创建 dingping 库并导入初始化脚本
+mysql -uroot -p
+CREATE DATABASE dingping CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+USE dingping;
+SOURCE src/main/resources/db/junshan.sql;
+
+# 2) 准备配置：复制脱敏模板，填入本地 MySQL / Redis 密码
+cp src/main/resources/application.example.yaml src/main/resources/application.yaml
+# 编辑 application.yaml，修改 spring.datasource.password 与 spring.redis.password
+
+# 3) 启动 Redis（端口 6380，需 5.0+）
+#    本机若无高版本 Redis，可直接运行 run.bat（会自动拉起便携版 Redis 8 监听 6380）
+
+# 4) 打包并运行
+mvn clean package
+java -jar target/junshan-dianping-0.0.1-SNAPSHOT.jar --server.port=8081
+# Windows 也可直接双击 run.bat 一键启动
+```
+
+后端启动后访问：`http://localhost:8081`
+
+> 提示：店铺列表依赖 Redis 缓存，首次启动后若查询提示"店铺不存在"，请先运行 `tools/preheat_redis.py` 预热缓存（需安装 redis-py）。
+
+### 2. 启动前端
+
+```bash
+cd frontend
+npm install          # 安装依赖
+npm run dev          # 开发模式，访问 http://localhost:5173 （/api 已代理到后端 8081）
+# 或生产构建：
+npm run build        # 产物在 frontend/dist
+npm run preview      # 本地预览构建产物（默认 4173）
+```
+
+> 后端未启动时，前端会自动使用内置 mock 数据渲染，三页（首页 / 点评列表 / 商户详情）界面完整可用。
+
+## ⚠️ 重要配置说明
+
+- **数据库名是 `dingping`**（不是 junshan），导入 `junshan.sql` 前请先建该库。
+- **Redis 端口为 6380**。系统自带的 Redis（6379）是 3.0 版本，不支持 GEO / BitMap 等命令；请使用 Redis 5.0+ 并监听 6380，或把 `application.yaml` 的 `spring.redis.port` 改成你的高版本实例端口。
+- **`application.yaml` 含数据库 / Redis 密码，已加入 `.gitignore` 不会提交**；协作时请用 `application.example.yaml` 作为模板自行填写。
+- 后端已配置 CORS，允许前端跨域直连；开发期由 Vite 代理 `/api` 转发到 `:8081`。
+
 ## 项目描述
 
 君山点评项目是一个 SpringBoot 开发的前后端分离项目，使用了Redis、Tomcat容器、MySQL提高服务性能。
@@ -21,7 +131,7 @@
 
 · 使用Redis的 ZSet 数据结构 实现了点赞排行榜功能,使用Set 集合实现关注、共同关注功能；
 
-# 君山定评项目 亮点难点
+# 君山点评项目 亮点难点
 
 ## 数据库主键设计：
 普通表不自增：内部数据无泄漏风险，索引速度最快
