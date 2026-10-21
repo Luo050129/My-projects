@@ -1,10 +1,23 @@
+# ===== 构建产物（可再生，勿提交）=====
 HELP.md
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+build/
+out/
+*.class
 
-### STS ###
+# ===== 前端：依赖与构建产物（体积大 / 可重新生成）=====
+node_modules/
+**/frontend/dist/
+**/dist/
+
+# ===== IDE / 编辑器 =====
+.idea/
+*.iml
+*.iws
+*.ipr
 .apt_generated
 .classpath
 .factorypath
@@ -12,32 +25,23 @@ target/
 .settings
 .springBeans
 .sts4-cache
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-
-### NetBeans ###
-/nbproject/private/
+.vscode/
+nbproject/
 /nbbuild/
-/dist/
 /nbdist/
 /.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### VS Code ###
-.vscode/
+# ===== 本地敏感配置（含数据库 / Redis 密码，勿提交）=====
+# 各项目内提供 application.example.yaml 作为模板，复制后本地填写
+**/src/main/resources/application.yaml
+**/src/main/resources/application-local.yaml
+**/src/main/resources/application-local.yml
+.env
+*.env
 
-# ===== 前端：依赖与构建产物（体积大/可重新生成，勿提交）=====
-frontend/node_modules/
-frontend/dist/
-
-# ===== 本地敏感配置（含数据库/Redis 密码，勿提交；参考 application.example.yaml）=====
-src/main/resources/application.yaml
-
-# ===== 工具私有目录（含本地工作记忆/路径，勿提交）=====
+# ===== 工具私有目录（含本地工作记忆 / 路径，勿提交）=====
 .workbuddy/
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db
