@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    # 生产用 MySQL 8
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/community?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai&useSSL=false
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  sql:
+    init:
+      mode: never   # 生产表结构由 Flyway/Liquibase 或 DBA 管理
+
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      timeout: 3000ms
+
+  rabbitmq:
+    host: ${RABBITMQ_HOST:127.0.0.1}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+
+community:
+  mq:
+    type: rabbitmq
+  jwt:
+    secret: ${JWT_SECRET:}
+    expiration-minutes: 120
+  ai:
+    api-key: ${DEEPSEEK_API_KEY:}

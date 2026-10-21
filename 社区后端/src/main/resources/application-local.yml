@@ -1,0 +1,32 @@
+spring:
+  datasource:
+    # H2 文件库（MySQL 兼容模式），本地零依赖即可运行
+    url: jdbc:h2:file:./data/community;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema-h2.sql
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      database: 0
+      timeout: 3000ms
+
+# 本地走虚拟线程异步，不连 RabbitMQ，关闭其健康检查避免整体 health=DOWN
+management:
+  health:
+    rabbit:
+      enabled: false
+
+community:
+  mq:
+    type: local   # local=虚拟线程异步；prod 可切 rabbitmq

@@ -1,0 +1,45 @@
+server:
+  port: 8088
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: community-backend
+  profiles:
+    active: local
+
+  # Jackson 时间格式统一
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    default-property-inclusion: non_null
+
+  # 可观测性：暴露关键端点
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,info,metrics,env
+    endpoint:
+      health:
+        show-details: never
+
+  # 全局校验失败直接抛 MethodArgumentNotValidException（由全局异常处理器收敛）
+  mvc:
+    throw-exception-if-no-handler-found: true
+
+community:
+  jwt:
+    # 演示用密钥，生产务必替换为 256bit 以上随机串并通过环境变量注入
+    # 改为环境变量可覆盖（默认仍是 demo 值，本地运行不受影响）
+    secret: ${JWT_SECRET:lxb-community-demo-secret-key-please-change-me-2026}
+    expiration-minutes: 120
+  ai:
+    enabled: true
+    provider: deepseek
+    base-url: https://api.deepseek.com
+    # 优先读环境变量 DEEPSEEK_API_KEY；留空则启用规则降级实现，保证离线可跑
+    api-key: ${DEEPSEEK_API_KEY:}
+    model: deepseek-chat
+    timeout-seconds: 20

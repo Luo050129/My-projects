@@ -1,0 +1,29 @@
+# ===== Build output =====
+target/
+**/target/
+*.class
+
+# ===== IDE =====
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# ===== Logs =====
+*.log
+logs/
+
+# ===== H2 runtime database (dev data, not source) =====
+data/
+*.db
+*.mv.db
+*.trace.db
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== Maven wrapper (not used here) =====
+.mvn/
