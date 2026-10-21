@@ -12,10 +12,10 @@
     </parent>
 
     <groupId>com.luoxianjun</groupId>
-    <artifactId>community-backend</artifactId>
+    <artifactId>zhidu-community</artifactId>
     <version>1.0.0</version>
-    <name>community-backend</name>
-    <description>企业级内容/知识社区后端 —— 面向 Java 实习求职的日常开发示范项目</description>
+    <name>知渡（ZhiDu）</name>
+    <description>内容 / 知识社区后端：鉴权、内容、通知与 AI 内容增强</description>
 
     <properties>
         <java.version>21</java.version>
@@ -113,7 +113,7 @@
     </dependencies>
 
     <build>
-        <finalName>community-backend</finalName>
+        <finalName>zhidu-community</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
