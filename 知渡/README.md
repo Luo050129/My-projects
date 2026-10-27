@@ -32,12 +32,13 @@
 | 安全 | Spring Security + JWT（HS256）+ RBAC | 无状态、方法级 `@PreAuthorize` |
 | AI 能力 | 自研 DeepSeek 客户端（OpenAI 兼容协议） | 无 Key 或调用失败时规则降级 |
 | 工程化 | Maven + JUnit5 + Mockito + Actuator | 自动化测试、可观测性、统一响应 |
+| 前端 | Vue 3 + Vite 6 + Vue Router 4（独立工程 `frontend/`） | 无 UI 库，样式手写；原生 fetch 调接口 |
 
 ---
 
 ## 三、快速开始
 
-环境要求：**JDK 21**、**Redis 6379**、Maven 3.9+。MySQL / RabbitMQ 仅在 `prod` profile 需要。
+环境要求：**JDK 21**、**Redis 6379**、Maven 3.9+。前端另需 **Node 18+**。MySQL / RabbitMQ 仅在 `prod` profile 需要。
 
 ```bash
 # 1. 打包
@@ -45,7 +46,13 @@ mvn -q -DskipTests package
 
 # 2. 本地启动（H2 文件库 + 原生 Redis + 虚拟线程异步，无需 MySQL / MQ）
 java -jar target/zhidu-community.jar --spring.profiles.active=local --server.port=8088
+
+# 3.（可选）启动前端，访问 http://localhost:5173
+cd frontend && npm install && npm run dev
 ```
+
+> 前端是独立工程，开发的 `/api` 请求由 Vite 代理到 `127.0.0.1:8088`。
+> 只调接口不开前端也能用，接口前缀是 `http://127.0.0.1:8088/api`。
 
 启动后：
 
@@ -372,6 +379,10 @@ java -jar zhidu-community.jar --spring.profiles.active=prod
 │   └── db/
 │       ├── schema-h2.sql
 │       └── schema-mysql.sql
+├── frontend/                       # Vue 3 + Vite 前端（独立工程）
+│   ├── src/views/                  # 登录 / 列表 / 详情 / 编辑 / 通知
+│   ├── src/api.js                  # 接口封装（自动带 JWT）
+│   └── README.md                   # 前端说明与部署方式
 └── src/test/                       # 单测 + 依赖真实 Redis 的集成测试
 ```
 

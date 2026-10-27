@@ -109,7 +109,7 @@ public class PostServiceImpl implements PostService {
         }
         post.setViewCount(post.getViewCount() + 1);
         postMapper.updateById(post);
-        PostVO vo = toVO(post);
+        PostVO vo = toVO(post, post.getContent());
         postCache.put(vo);
         return vo;
     }
@@ -167,7 +167,7 @@ public class PostServiceImpl implements PostService {
         postCache.get(id).ifPresent(vo -> {
             if (!postCache.isNullMarker(vo)) {
                 PostVO updated = new PostVO(vo.id(), vo.authorId(), vo.authorName(), vo.title(),
-                        vo.summary(), vo.tags(), vo.status(), vo.viewCount(),
+                        vo.summary(), vo.content(), vo.tags(), vo.status(), vo.viewCount(),
                         vo.likeCount() + delta, vo.commentCount(), vo.aiEnhanced(), vo.createTime());
                 postCache.put(updated);
             }
@@ -200,11 +200,17 @@ public class PostServiceImpl implements PostService {
         return post;
     }
 
+    /** 列表场景：不返回正文，减小响应体 */
     private PostVO toVO(Post p) {
+        return toVO(p, null);
+    }
+
+    /** 详情场景：带上正文 */
+    private PostVO toVO(Post p, String content) {
         User author = userMapper.selectById(p.getUserId());
         String name = author != null ? author.getNickname() : "未知用户";
         return new PostVO(p.getId(), p.getUserId(), name, p.getTitle(), p.getSummary(),
-                p.getTags(), p.getStatus(), p.getViewCount(), p.getLikeCount(),
+                content, p.getTags(), p.getStatus(), p.getViewCount(), p.getLikeCount(),
                 p.getCommentCount(), p.getAiEnhanced(), p.getCreateTime());
     }
 }
