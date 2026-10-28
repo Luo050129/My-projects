@@ -23,6 +23,8 @@ public class Post {
     private String content;
     private String summary;
     private String tags;
+    /** 封面图访问路径，可为空（纯文字帖） */
+    private String coverImage;
 
     private Integer status;
     private Integer viewCount;

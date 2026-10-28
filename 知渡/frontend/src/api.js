@@ -2,24 +2,8 @@ import { auth, signOut } from './auth'
 
 const BASE = '/api'
 
-/**
- * 统一请求封装：
- * - 自动带 JWT
- * - 后端约定 code=0 为成功，非 0 抛业务错误
- * - 401 清登录态
- */
-export async function request(path, { method = 'GET', body, auth: needAuth = false } = {}) {
-  const headers = { 'Content-Type': 'application/json' }
-  if (auth.token) {
-    headers.Authorization = `Bearer ${auth.token}`
-  }
-
-  const res = await fetch(BASE + path, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body)
-  })
-
+/** 统一解析响应：HTTP 层与业务层的错误都在这里收敛成 Error */
+async function parseResponse(res) {
   let payload = null
   try {
     payload = await res.json()
@@ -42,6 +26,27 @@ export async function request(path, { method = 'GET', body, auth: needAuth = fal
   }
 
   return payload?.data
+}
+
+/**
+ * 统一请求封装：
+ * - 自动带 JWT
+ * - 后端约定 code=0 为成功，非 0 抛业务错误
+ * - 401 清登录态
+ */
+export async function request(path, { method = 'GET', body, auth: needAuth = false } = {}) {
+  const headers = { 'Content-Type': 'application/json' }
+  if (auth.token) {
+    headers.Authorization = `Bearer ${auth.token}`
+  }
+
+  const res = await fetch(BASE + path, {
+    method,
+    headers,
+    body: body === undefined ? undefined : JSON.stringify(body)
+  })
+
+  return parseResponse(res)
 }
 
 // ---------- 认证 ----------
@@ -91,3 +96,21 @@ export const readNotification = (id) =>
   request(`/notifications/${id}/read`, { method: 'POST' })
 export const readAllNotifications = () =>
   request('/notifications/read-all', { method: 'POST' })
+
+// ---------- 文件 ----------
+/**
+ * 上传图片。必须走 FormData：手动设 Content-Type 会覆盖掉浏览器生成的
+ * multipart boundary，后端会报「Current request is not a multipart request」。
+ */
+export async function uploadImage(file) {
+  const fd = new FormData()
+  fd.append('file', file)
+
+  const headers = {}
+  if (auth.token) {
+    headers.Authorization = `Bearer ${auth.token}`
+  }
+
+  const res = await fetch(BASE + '/files/upload', { method: 'POST', headers, body: fd })
+  return parseResponse(res)
+}

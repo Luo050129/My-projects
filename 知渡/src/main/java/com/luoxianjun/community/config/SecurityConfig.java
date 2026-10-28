@@ -51,6 +51,8 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/h2-console/**").permitAll()
                 // 内容读接口公开
                 .requestMatchers(HttpMethod.GET, "/posts", "/posts/*", "/comments/posts/**").permitAll()
+                // 上传的图片需公开可读（img 标签无法带 Authorization 头，必须放行 GET）
+                .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
                 // 其余均需要登录
                 .anyRequest().authenticated()
             )

@@ -14,6 +14,8 @@ public record PostVO(
         /** 正文：仅详情接口返回；列表接口置 null，避免响应体过大 */
         String content,
         String tags,
+        /** 封面图访问路径，可为空 */
+        String coverImage,
         Integer status,
         Integer viewCount,
         Integer likeCount,

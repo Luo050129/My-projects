@@ -16,19 +16,24 @@
       <div v-if="!posts.length" class="empty">还没有帖子</div>
 
       <article v-for="post in posts" :key="post.id" class="panel post-card">
-        <router-link :to="`/posts/${post.id}`" class="post-title">{{ post.title }}</router-link>
-        <p v-if="post.summary" class="summary">{{ post.summary }}</p>
-        <div class="meta">
-          <span>{{ post.authorName }}</span>
-          <span class="dot">·</span>
-          <span>{{ formatTime(post.createTime) }}</span>
-          <span class="dot">·</span>
-          <span>{{ post.viewCount }} 浏览</span>
-          <span class="dot">·</span>
-          <span>{{ post.likeCount }} 赞</span>
-          <span class="dot">·</span>
-          <span>{{ post.commentCount }} 评论</span>
-          <span v-if="post.aiEnhanced === 1" class="tag ai-tag">AI 摘要</span>
+        <router-link v-if="post.coverImage" :to="`/posts/${post.id}`" class="thumb">
+          <img :src="post.coverImage" alt="封面" loading="lazy" />
+        </router-link>
+        <div class="post-main">
+          <router-link :to="`/posts/${post.id}`" class="post-title">{{ post.title }}</router-link>
+          <p v-if="post.summary" class="summary">{{ post.summary }}</p>
+          <div class="meta">
+            <span>{{ post.authorName }}</span>
+            <span class="dot">·</span>
+            <span>{{ formatTime(post.createTime) }}</span>
+            <span class="dot">·</span>
+            <span>{{ post.viewCount }} 浏览</span>
+            <span class="dot">·</span>
+            <span>{{ post.likeCount }} 赞</span>
+            <span class="dot">·</span>
+            <span>{{ post.commentCount }} 评论</span>
+            <span v-if="post.aiEnhanced === 1" class="tag ai-tag">AI 摘要</span>
+          </div>
         </div>
       </article>
 
@@ -103,10 +108,31 @@ onMounted(load)
   flex: 1;
 }
 .post-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
   transition: border-color 0.15s;
 }
 .post-card:hover {
   border-color: #3a4150;
+}
+.thumb {
+  flex: 0 0 auto;
+  width: 112px;
+  height: 78px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.post-main {
+  flex: 1;
+  min-width: 0;
 }
 .post-title {
   font-size: 16px;

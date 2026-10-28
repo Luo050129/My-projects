@@ -16,6 +16,8 @@
           <span>{{ post.viewCount }} 浏览</span>
         </div>
 
+        <img v-if="post.coverImage" :src="post.coverImage" :alt="post.title" class="cover" />
+
         <div v-if="tags.length" class="tags">
           <span v-for="t in tags" :key="t" class="tag">{{ t }}</span>
         </div>
@@ -184,6 +186,15 @@ onMounted(load)
 }
 .dot {
   opacity: 0.5;
+}
+.cover {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  margin: 14px 0 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 .tags {
   margin: 12px 0 0;

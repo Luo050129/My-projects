@@ -16,6 +16,8 @@ target/
 logs/
 
 # ===== H2 runtime database (dev data, not source) =====
+# data/ 同时包含 uploads/（用户上传的图片）。这些是运行时数据，
+# 不入库；目录由程序启动时自动创建。
 data/
 *.db
 *.mv.db

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS t_post (
     content       VARCHAR(8000) NOT NULL                COMMENT '正文',
     summary       VARCHAR(500)  NULL                    COMMENT 'AI 摘要',
     tags          VARCHAR(255)  NULL                    COMMENT '标签，逗号分隔',
+    cover_image   VARCHAR(255)  NULL                    COMMENT '封面图访问路径',
     status        TINYINT       NOT NULL DEFAULT 1      COMMENT '1 已发布 0 草稿',
     view_count    INT           NOT NULL DEFAULT 0      COMMENT '浏览量',
     like_count    INT           NOT NULL DEFAULT 0      COMMENT '点赞数',

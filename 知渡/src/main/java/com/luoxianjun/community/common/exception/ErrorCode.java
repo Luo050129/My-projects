@@ -24,7 +24,12 @@ public enum ErrorCode {
 
     NOTIFY_NOT_FOUND(40001, "通知不存在"),
 
-    AI_SERVICE_UNAVAILABLE(50001, "AI 服务暂不可用");
+    AI_SERVICE_UNAVAILABLE(50001, "AI 服务暂不可用"),
+
+    FILE_EMPTY(60001, "文件为空"),
+    FILE_TYPE_UNSUPPORTED(60002, "仅支持 PNG / JPEG / GIF / WEBP 图片"),
+    FILE_TOO_LARGE(60003, "图片大小超出限制"),
+    FILE_SAVE_FAILED(60004, "文件保存失败，请稍后重试");
 
     private final int code;
     private final String message;

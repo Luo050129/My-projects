@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS t_post (
     content      VARCHAR(8000) NOT NULL,
     summary      VARCHAR(500),
     tags         VARCHAR(255),
+    cover_image  VARCHAR(255),
     status       TINYINT      NOT NULL DEFAULT 1,
     view_count   INT          NOT NULL DEFAULT 0,
     like_count   INT          NOT NULL DEFAULT 0,
@@ -66,3 +67,12 @@ CREATE TABLE IF NOT EXISTS t_notification (
     create_time  DATETIME     DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_notify_receiver ON t_notification (receiver_id, read_status);
+
+-- ------------------------------------------------------------
+-- 增量迁移：老库补字段
+-- CREATE TABLE IF NOT EXISTS 对新库有效，但已存在的表不会加列，
+-- 直接依赖上面的建表语句会导致老库启动后插入报「列不存在」。
+-- H2 支持 ADD COLUMN IF NOT EXISTS，重复执行无副作用。
+-- MySQL 8 不支持该语法，生产环境请人工执行对应 ALTER（见 schema-mysql.sql 文件头）。
+-- ------------------------------------------------------------
+ALTER TABLE t_post ADD COLUMN IF NOT EXISTS cover_image VARCHAR(255);

@@ -12,6 +12,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 /**
  * 全局异常处理器：统一收敛业务异常 / 校验异常 / 鉴权异常，返回规范 Result。
@@ -56,6 +57,16 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public Result<Void> handleAccess(AccessDeniedException e) {
         return Result.error(ErrorCode.FORBIDDEN.getCode(), ErrorCode.FORBIDDEN.getMessage());
+    }
+
+    /**
+     * 上传体积超限。这个异常在进入 Controller 之前就被容器抛出来，
+     * 若交给兜底的 Exception handler 会返回 500，把「文件太大」误报成「服务异常」。
+     */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public Result<Void> handleUploadSize(MaxUploadSizeExceededException e) {
+        return Result.error(ErrorCode.FILE_TOO_LARGE.getCode(), ErrorCode.FILE_TOO_LARGE.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

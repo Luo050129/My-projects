@@ -8,6 +8,7 @@ import com.luoxianjun.community.common.exception.BizException;
 import com.luoxianjun.community.common.exception.ErrorCode;
 import com.luoxianjun.community.common.result.PageResult;
 import com.luoxianjun.community.common.util.RedisLock;
+import com.luoxianjun.community.config.StorageProperties;
 import com.luoxianjun.community.module.content.cache.PostCacheService;
 import com.luoxianjun.community.module.content.dto.PostVO;
 import com.luoxianjun.community.module.content.dto.request.CreatePostRequest;
@@ -19,12 +20,14 @@ import com.luoxianjun.community.module.content.service.PostService;
 import com.luoxianjun.community.module.user.entity.User;
 import com.luoxianjun.community.module.user.mapper.UserMapper;
 import com.luoxianjun.community.security.SecurityUtil;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -36,6 +39,32 @@ public class PostServiceImpl implements PostService {
     private final UserMapper userMapper;
     private final PostCacheService postCache;
     private final RedisLock redisLock;
+    private final StorageProperties storageProperties;
+
+    /**
+     * 封面图白名单：只接受本服务上传接口产出的路径。
+     * 校验放在服务端而不是只靠前端，因为请求可以被绕过；
+     * 允许任意 URL 会带来两个问题：外链失效后页面破图，删帖时也无法回收本地文件。
+     */
+    private Pattern coverPattern;
+
+    @PostConstruct
+    void initCoverPattern() {
+        String prefix = Pattern.quote(storageProperties.getPublicPrefix());
+        this.coverPattern = Pattern.compile(prefix + "/\\d{4}/\\d{2}/[0-9a-f]{32}\\.(png|jpg|gif|webp)");
+    }
+
+    /** 空值归一为 null；非空则必须匹配上传路径，否则拒绝而不是静默丢弃 */
+    private String normalizeCoverImage(String coverImage) {
+        if (coverImage == null || coverImage.isBlank()) {
+            return null;
+        }
+        String v = coverImage.trim();
+        if (!coverPattern.matcher(v).matches()) {
+            throw new BizException(ErrorCode.PARAM_INVALID, "封面图地址不合法，请先通过上传接口获取");
+        }
+        return v;
+    }
 
     /** 缓存未命中时自旋等待缓存被回填的参数：最多等 2s（100 × 20ms） */
     private static final int CACHE_SPIN_TIMES = 100;
@@ -49,6 +78,7 @@ public class PostServiceImpl implements PostService {
         post.setTitle(request.title());
         post.setContent(request.content());
         post.setTags(request.tags());
+        post.setCoverImage(normalizeCoverImage(request.coverImage()));
         post.setStatus(1);
         post.setViewCount(0);
         post.setLikeCount(0);
@@ -65,6 +95,7 @@ public class PostServiceImpl implements PostService {
         post.setTitle(request.title());
         post.setContent(request.content());
         post.setTags(request.tags());
+        post.setCoverImage(normalizeCoverImage(request.coverImage()));
         postMapper.updateById(post);
         postCache.evict(id);
     }
@@ -167,7 +198,7 @@ public class PostServiceImpl implements PostService {
         postCache.get(id).ifPresent(vo -> {
             if (!postCache.isNullMarker(vo)) {
                 PostVO updated = new PostVO(vo.id(), vo.authorId(), vo.authorName(), vo.title(),
-                        vo.summary(), vo.content(), vo.tags(), vo.status(), vo.viewCount(),
+                        vo.summary(), vo.content(), vo.tags(), vo.coverImage(), vo.status(), vo.viewCount(),
                         vo.likeCount() + delta, vo.commentCount(), vo.aiEnhanced(), vo.createTime());
                 postCache.put(updated);
             }
@@ -210,7 +241,7 @@ public class PostServiceImpl implements PostService {
         User author = userMapper.selectById(p.getUserId());
         String name = author != null ? author.getNickname() : "未知用户";
         return new PostVO(p.getId(), p.getUserId(), name, p.getTitle(), p.getSummary(),
-                content, p.getTags(), p.getStatus(), p.getViewCount(), p.getLikeCount(),
+                content, p.getTags(), p.getCoverImage(), p.getStatus(), p.getViewCount(), p.getLikeCount(),
                 p.getCommentCount(), p.getAiEnhanced(), p.getCreateTime());
     }
 }

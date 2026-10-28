@@ -16,6 +16,9 @@ public record UpdatePostRequest(
         String content,
 
         @Size(max = 255, message = "标签过长")
-        String tags
+        String tags,
+
+        @Size(max = 255, message = "封面图路径过长")
+        String coverImage
 ) {
 }

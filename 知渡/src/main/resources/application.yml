@@ -29,12 +29,24 @@ spring:
   mvc:
     throw-exception-if-no-handler-found: true
 
+  # 上传体积限制：默认只有 1MB，不调会导致稍大的截图直接被容器拒掉
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
 community:
   jwt:
     # 演示用密钥，生产务必替换为 256bit 以上随机串并通过环境变量注入
     # 改为环境变量可覆盖（默认仍是 demo 值，本地运行不受影响）
     secret: ${JWT_SECRET:lxb-community-demo-secret-key-please-change-me-2026}
     expiration-minutes: 120
+  storage:
+    # 本地上传目录（相对进程工作目录）；生产可替换为对象存储实现
+    upload-dir: ${UPLOAD_DIR:./data/uploads}
+    # 对外访问前缀，必须与 server.servlet.context-path 一致
+    public-prefix: /api/uploads
+    max-size-bytes: 5242880
   ai:
     enabled: true
     provider: deepseek
