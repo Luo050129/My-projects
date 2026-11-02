@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 320" width="1200" height="320">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#111726"/>
+      <stop offset="55%" stop-color="#0f1115"/>
+      <stop offset="100%" stop-color="#0c1018"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0.1" cy="0.05" r="0.75">
+      <stop offset="0%" stop-color="#4f8cff" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#4f8cff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0.92" cy="0.95" r="0.7">
+      <stop offset="0%" stop-color="#3ecf8e" stop-opacity="0.28"/>
+      <stop offset="100%" stop-color="#3ecf8e" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#232b3d" stroke-width="1" opacity="0.5"/>
+    </pattern>
+    <linearGradient id="accentBar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4f8cff"/>
+      <stop offset="100%" stop-color="#3ecf8e"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="320" fill="url(#bg)"/>
+  <rect width="1200" height="320" fill="url(#grid)"/>
+  <rect width="1200" height="320" fill="url(#glowA)"/>
+  <rect width="1200" height="320" fill="url(#glowB)"/>
+  <rect x="0" y="0" width="1200" height="3" fill="url(#accentBar)"/>
+
+  <g font-family="Segoe UI, Microsoft YaHei, PingFang SC, sans-serif">
+    <!-- 品牌 -->
+    <text x="72" y="112" fill="#f2f5fa" font-size="62" font-weight="700" letter-spacing="6">知渡</text>
+    <text x="240" y="110" fill="#5b6b86" font-size="26" font-weight="600" letter-spacing="4">ZhiDu</text>
+    <text x="74" y="152" fill="#9aa8bf" font-size="19" letter-spacing="1">内容 / 知识社区 · 读多写少场景的完整后端实践</text>
+
+    <!-- 技术标签 -->
+    <g font-size="14" fill="#a9b8d0">
+      <rect x="74" y="186" width="126" height="34" rx="17" fill="#18212f" stroke="#2b3648"/>
+      <text x="96" y="209">Spring Boot 3</text>
+
+      <rect x="212" y="186" width="112" height="34" rx="17" fill="#18212f" stroke="#2b3648"/>
+      <text x="236" y="209">Java 21</text>
+
+      <rect x="336" y="186" width="92" height="34" rx="17" fill="#18212f" stroke="#2b3648"/>
+      <text x="360" y="209">Redis</text>
+
+      <rect x="440" y="186" width="146" height="34" rx="17" fill="#18212f" stroke="#2b3648"/>
+      <text x="462" y="209">MyBatis-Plus</text>
+
+      <rect x="598" y="186" width="124" height="34" rx="17" fill="#18212f" stroke="#2b3648"/>
+      <text x="620" y="209">React 18</text>
+
+      <rect x="734" y="186" width="150" height="34" rx="17" fill="#18212f" stroke="#2b3648"/>
+      <text x="756" y="209">DeepSeek AI</text>
+    </g>
+
+    <text x="74" y="266" fill="#5f7292" font-size="13" letter-spacing="2">JWT · CACHE-ASIDE · 防击穿 · 幂等 · 私密可见性 · RAG-LITE</text>
+
+    <!-- 右侧系统示意：整体缩放并上移，保证不越界也不压住下方标签 -->
+    <g transform="translate(848,20) scale(0.92)">
+      <!-- 请求入口 -->
+      <rect x="0" y="86" width="60" height="34" rx="7" fill="#16202e" stroke="#3a4a63"/>
+      <text x="13" y="108" fill="#a9b8d0" font-size="12">请求</text>
+
+      <path d="M62 103 H88" stroke="#3a4a63" stroke-width="1.5"/>
+      <circle cx="88" cy="103" r="3" fill="#4f8cff"/>
+
+      <!-- 缓存层 -->
+      <rect x="92" y="66" width="96" height="74" rx="10" fill="#141d2a" stroke="#4f8cff" stroke-opacity="0.75"/>
+      <text x="112" y="94" fill="#7fb0ff" font-size="13" font-weight="600">Redis</text>
+      <text x="106" y="116" fill="#5f7292" font-size="11">Cache-Aside</text>
+      <text x="110" y="131" fill="#5f7292" font-size="11">分布式锁</text>
+
+      <!-- 回源箭头 -->
+      <path d="M190 103 H218" stroke="#3a4a63" stroke-width="1.5" stroke-dasharray="4 3"/>
+      <text x="184" y="92" fill="#5f7292" font-size="10">回源</text>
+
+      <!-- 数据库 -->
+      <rect x="222" y="66" width="86" height="74" rx="10" fill="#141d2a" stroke="#3a4a63"/>
+      <ellipse cx="265" cy="86" rx="26" ry="8" fill="none" stroke="#3a4a63"/>
+      <path d="M239 86V120M291 86V120" stroke="#3a4a63"/>
+      <ellipse cx="265" cy="120" rx="26" ry="8" fill="none" stroke="#3a4a63"/>
+      <text x="238" y="158" fill="#5f7292" font-size="11">MySQL / H2</text>
+
+      <!-- 向量点阵 -->
+      <g fill="#3ecf8e" opacity="0.85">
+        <circle cx="150" cy="8" r="2.5"/><circle cx="186" cy="18" r="2.5"/><circle cx="222" cy="4" r="2.5"/>
+        <circle cx="258" cy="22" r="2.5"/><circle cx="294" cy="10" r="2.5"/><circle cx="322" cy="26" r="2.5"/>
+      </g>
+      <text x="240" y="44" fill="#3ecf8e" font-size="11" opacity="0.8">AI 摘要 / 降级</text>
+    </g>
+  </g>
+</svg>

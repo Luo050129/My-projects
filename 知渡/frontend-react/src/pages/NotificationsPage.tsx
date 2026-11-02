@@ -29,11 +29,11 @@ export default function NotificationsPage() {
 
   const { data, loading, error, reload, setData, setError } = useAsync<NotifyData>(
     async (signal) => {
-      const [items, unread] = await Promise.all([
-        fetchNotifications(signal),
+      const [page, unread] = await Promise.all([
+        fetchNotifications(1, 50, signal),
         fetchUnreadCount(signal)
       ])
-      return { items: items ?? [], unread: unread ?? 0 }
+      return { items: page?.records ?? [], unread: unread ?? 0 }
     },
     []
   )

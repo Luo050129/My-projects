@@ -1,7 +1,51 @@
-# 知渡（ZhiDu）—— 内容 / 知识社区后端
+# 知渡（ZhiDu）—— 内容 / 知识社区
 
-> 一个面向内容社区场景的后端服务。围绕「读多写少、热点集中、写操作需幂等、外部模型不可靠」这四类典型特征做设计，
-> 覆盖鉴权、内容、通知与 AI 内容增强四个领域，并保证在**不装 MySQL / RabbitMQ** 的本地环境下也能完整跑起来。
+![知渡 · 内容 / 知识社区](docs/screenshots/banner.png)
+
+<p>
+  <img alt="Java" src="https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white">
+  <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-3.4-brightgreen?logo=springboot&logoColor=white">
+  <img alt="Redis" src="https://img.shields.io/badge/Redis-Cache-red?logo=redis&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=black">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.7-3178c6?logo=typescript&logoColor=white">
+</p>
+
+> 一个面向内容社区场景的全栈项目。围绕「读多写少、热点集中、写操作需幂等、外部模型不可靠」这四类典型特征做设计，
+> 覆盖鉴权、内容、互动、通知与 AI 内容增强五个领域，并保证在**不装 MySQL / RabbitMQ** 的本地环境下也能完整跑起来。
+
+---
+
+## 界面预览
+
+真实运行的界面截图（本地起 `local` profile + React 前端采集，非设计稿）。
+
+**首页列表** —— 图文帖带封面，纯文字帖只有标题与摘要，AI 增强过的帖子带绿色「AI 摘要」标签。
+
+![首页列表](docs/screenshots/home.png)
+
+**帖子详情** —— 缓存兜底的读路径；「已赞 / 已收藏」按当前用户单独查询，不进公共缓存。
+
+![帖子详情](docs/screenshots/detail.png)
+
+**个人中心** —— 一次登录看全自己的帖子（含私密，右上角有标记）、评论、点赞、收藏、关注与粉丝。
+
+![个人中心](docs/screenshots/profile.png)
+
+**粉丝与关注** —— 每行可直接关注/取关，关注关系用唯一索引保证重复点击幂等。
+
+![粉丝列表](docs/screenshots/profile-followers.png)
+
+**发布帖子** —— 两种形态：纯文字长文、图文配封面；可一键设为私密，私密帖不进首页列表、只有作者能打开。
+
+![发布帖子](docs/screenshots/editor.png)
+
+**通知** —— 评论、点赞异步解耦投递，未读数实时显示在导航栏。
+
+![通知](docs/screenshots/notifications.png)
+
+**登录 / 注册** —— JWT 无状态鉴权，token 过期由请求层统一拦截并回跳登录页。
+
+![登录](docs/screenshots/login.png)
 
 ---
 

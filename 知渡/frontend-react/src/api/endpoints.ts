@@ -143,8 +143,9 @@ export const addComment = (
 ) => request<number>('/comments', { method: 'POST', body: { postId, content, parentId }, signal })
 
 // ---------- 通知 ----------
-export const fetchNotifications = (signal?: AbortSignal) =>
-  request<Notification[]>('/notifications', { signal })
+/** 与评论同理：后端返回分页结构，不是裸数组 */
+export const fetchNotifications = (current = 1, size = 50, signal?: AbortSignal) =>
+  request<PageResult<Notification>>(`/notifications?current=${current}&size=${size}`, { signal })
 
 export const fetchUnreadCount = (signal?: AbortSignal) =>
   request<number>('/notifications/unread-count', { signal })
