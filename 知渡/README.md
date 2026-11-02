@@ -520,3 +520,5 @@ java -jar zhidu-community.jar --spring.profiles.active=prod
 ```
 
 > 包名保留 `com.luoxianjun.community`：`community` 与「社区」语义一致，改名会牵动全部源文件却无实质收益。
+>
+> 注意：本项目为VibeCoding开发
