@@ -1,0 +1,24 @@
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.search {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.search input {
+  flex: 1;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+}

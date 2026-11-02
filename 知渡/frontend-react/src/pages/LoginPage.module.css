@@ -1,0 +1,55 @@
+.wrap {
+  display: flex;
+  justify-content: center;
+  padding-top: 6vh;
+}
+
+.panel {
+  width: 360px;
+  padding: 28px 26px 22px;
+}
+
+.title {
+  margin: 0;
+  font-size: 26px;
+  letter-spacing: 3px;
+  text-align: center;
+}
+
+.sub {
+  text-align: center;
+  margin: 4px 0 20px;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.tab {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  padding: 8px 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.full {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.hint {
+  text-align: center;
+  margin: 18px 0 0;
+}

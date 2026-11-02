@@ -1,0 +1,66 @@
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(15, 17, 21, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.brand {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 1px;
+}
+
+.links {
+  display: flex;
+  gap: 16px;
+  flex: 1;
+}
+
+.links a {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.links a:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.active {
+  color: var(--text);
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 4px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 5px;
+  border-radius: 999px;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.who {
+  font-size: 13px;
+  color: var(--muted);
+}

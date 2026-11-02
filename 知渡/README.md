@@ -33,7 +33,7 @@
 | AI 能力 | 自研 DeepSeek 客户端（OpenAI 兼容协议） | 无 Key 或调用失败时规则降级 |
 | 工程化 | Maven + JUnit5 + Mockito + Actuator | 自动化测试、可观测性、统一响应 |
 | 文件存储 | 本地磁盘 + 静态资源映射（可替换为对象存储） | 魔数校验、UUID 重命名、按年月分目录 |
-| 前端 | Vue 3 + Vite 6 + Vue Router 4（独立工程 `frontend/`） | 无 UI 库，样式手写；原生 fetch 调接口 |
+| 前端 | 双实现：Vue 3 + Vite 6（`frontend/`）、React 18 + TS + Vite 6（`frontend-react/`） | 同一套后端接口；两版功能对齐，可并行启动做技术栈对比 |
 
 ---
 
@@ -48,12 +48,14 @@ mvn -q -DskipTests package
 # 2. 本地启动（H2 文件库 + 原生 Redis + 虚拟线程异步，无需 MySQL / MQ）
 java -jar target/zhidu-community.jar --spring.profiles.active=local --server.port=8088
 
-# 3.（可选）启动前端，访问 http://localhost:5173
-cd frontend && npm install && npm run dev
+# 3.（可选）启动前端，二选一或同时启动
+cd frontend && npm install && npm run dev          # Vue 3 版 → http://localhost:5173
+cd frontend-react && npm install && npm run dev    # React 18 版 → http://localhost:5174
 ```
 
 > 前端是独立工程，开发的 `/api` 请求由 Vite 代理到 `127.0.0.1:8088`。
 > 只调接口不开前端也能用，接口前缀是 `http://127.0.0.1:8088/api`。
+> 两版端口错开，可同时运行对照；它们连的是同一个后端，数据一致。
 
 启动后：
 
@@ -432,6 +434,12 @@ java -jar zhidu-community.jar --spring.profiles.active=prod
 │   ├── src/views/                  # 登录 / 列表 / 详情 / 编辑 / 通知
 │   ├── src/api.js                  # 接口封装（自动带 JWT）
 │   └── README.md                   # 前端说明与部署方式
+├── frontend-react/                 # React 18 + TypeScript 前端（独立工程）
+│   ├── src/api/                    # 请求层 + DTO 类型 + 接口清单
+│   ├── src/auth/                   # Context + useReducer 的登录态
+│   ├── src/hooks/                  # useAsync / useDebouncedValue
+│   ├── src/pages/                  # 与 Vue 版一一对应的五个页面
+│   └── README.md                   # React 版说明与差异对照
 └── src/test/                       # 单测 + 依赖真实 Redis 的集成测试
 ```
 
