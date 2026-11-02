@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent, DragEvent, FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { createPost, fetchPost, updatePost, uploadImage } from '../api/endpoints'
+import type { PostPayload, PostType } from '../api/types'
+import { VISIBILITY_PRIVATE, VISIBILITY_PUBLIC } from '../api/types'
 import { useToast } from '../components/ToastProvider'
 import { validateCover } from '../utils/format'
 import styles from './PostEditorPage.module.css'
@@ -11,9 +13,23 @@ interface FormState {
   content: string
   tags: string
   coverImage: string
+  postType: PostType
+  visibility: number
 }
 
-const EMPTY: FormState = { title: '', content: '', tags: '', coverImage: '' }
+const EMPTY: FormState = {
+  title: '',
+  content: '',
+  tags: '',
+  coverImage: '',
+  postType: 'TEXT',
+  visibility: VISIBILITY_PUBLIC
+}
+
+const TYPE_OPTIONS: { value: PostType; label: string; desc: string }[] = [
+  { value: 'TEXT', label: '纯文字', desc: '以正文为主，不需要配图' },
+  { value: 'IMAGE', label: '图文', desc: '需要一张封面，正文可写简短说明' }
+]
 
 export default function PostEditorPage() {
   const { id } = useParams()
@@ -28,7 +44,7 @@ export default function PostEditorPage() {
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // 编辑态：回填原帖内容。用 ignore 标记避免组件已卸载后 setState
+  // 编辑态：回填原帖内容。用 abort 避免组件已卸载后 setState
   useEffect(() => {
     if (!id) return
     const controller = new AbortController()
@@ -39,7 +55,9 @@ export default function PostEditorPage() {
           title: post.title ?? '',
           content: post.content ?? '',
           tags: post.tags ?? '',
-          coverImage: post.coverImage ?? ''
+          coverImage: post.coverImage ?? '',
+          postType: post.postType ?? 'TEXT',
+          visibility: post.visibility ?? VISIBILITY_PUBLIC
         })
       })
       .catch((err: unknown) => {
@@ -52,6 +70,16 @@ export default function PostEditorPage() {
 
   const patch = (part: Partial<FormState>) => setForm((prev) => ({ ...prev, ...part }))
 
+  /**
+   * 切换形态时清掉封面：选「纯文字」却留着封面，后端会按图文处理（它只认有没有图），
+   * 用户看到的结果就和选择不一致了。
+   */
+  const switchType = (next: PostType) => {
+    if (next === form.postType) return
+    setError('')
+    patch({ postType: next, coverImage: next === 'TEXT' ? '' : form.coverImage })
+  }
+
   const handleFile = async (file: File) => {
     const message = validateCover(file)
     if (message) {
@@ -63,7 +91,8 @@ export default function PostEditorPage() {
     setUploading(true)
     try {
       const result = await uploadImage(file)
-      patch({ coverImage: result.url })
+      // 上传封面本身就意味着这是图文帖，顺手把类型切成 IMAGE
+      patch({ coverImage: result.url, postType: 'IMAGE' })
       showToast('封面已上传', 'ok')
     } catch (err) {
       setError(err instanceof Error ? err.message : '上传失败')
@@ -95,19 +124,29 @@ export default function PostEditorPage() {
       setError('标题和正文不能为空')
       return
     }
+    if (form.postType === 'IMAGE' && !form.coverImage) {
+      setError('图文帖需要先上传一张封面')
+      return
+    }
+
+    const payload: PostPayload = {
+      title: form.title.trim(),
+      content: form.content.trim(),
+      tags: form.tags.trim(),
+      coverImage: form.postType === 'IMAGE' ? form.coverImage || null : null,
+      postType: form.postType,
+      visibility: form.visibility
+    }
 
     setSubmitting(true)
     try {
-      // 空字符串转 null：避免后端把 "" 当成非法封面地址
-      const payload = { ...form, coverImage: form.coverImage || null }
-
       if (id) {
         await updatePost(id, payload)
         showToast('修改已保存', 'ok')
         navigate(`/posts/${id}`, { replace: true })
       } else {
         const newId = await createPost(payload)
-        showToast('发布成功', 'ok')
+        showToast(form.visibility === VISIBILITY_PRIVATE ? '已发布（仅自己可见）' : '发布成功', 'ok')
         navigate(`/posts/${newId}`, { replace: true })
       }
     } catch (err) {
@@ -123,6 +162,27 @@ export default function PostEditorPage() {
 
       <form onSubmit={handleSubmit}>
         <div className="field">
+          <label>帖子样式</label>
+          <div className={styles.typeGroup} role="radiogroup" aria-label="帖子样式">
+            {TYPE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={form.postType === option.value}
+                className={`${styles.typeCard} ${
+                  form.postType === option.value ? styles.typeCardActive : ''
+                }`}
+                onClick={() => switchType(option.value)}
+              >
+                <span className={styles.typeLabel}>{option.label}</span>
+                <span className={styles.typeDesc}>{option.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="field">
           <label htmlFor="title">标题</label>
           <input
             id="title"
@@ -134,71 +194,79 @@ export default function PostEditorPage() {
           />
         </div>
 
-        <div className="field">
-          <label>封面图（可选）</label>
-          <div
-            className={[styles.drop, dragging ? styles.dragging : '', form.coverImage ? styles.filled : '']
-              .filter(Boolean)
-              .join(' ')}
-            onClick={() => !uploading && fileInputRef.current?.click()}
-            onDragOver={(event) => {
-              event.preventDefault()
-              setDragging(true)
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click()
-            }}
-          >
-            {form.coverImage ? (
-              <img src={form.coverImage} alt="封面预览" className={styles.preview} />
-            ) : (
-              <span className="muted small">
-                {uploading ? '上传中…' : '点击或拖拽图片到此处 · PNG / JPG / GIF / WEBP · ≤5MB'}
-              </span>
+        {form.postType === 'IMAGE' && (
+          <div className="field">
+            <label>封面图（图文帖必填）</label>
+            <div
+              className={[
+                styles.drop,
+                dragging ? styles.dragging : '',
+                form.coverImage ? styles.filled : ''
+              ]
+                .filter(Boolean)
+                .join(' ')}
+              onClick={() => !uploading && fileInputRef.current?.click()}
+              onDragOver={(event) => {
+                event.preventDefault()
+                setDragging(true)
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') fileInputRef.current?.click()
+              }}
+            >
+              {form.coverImage ? (
+                <img src={form.coverImage} alt="封面预览" className={styles.preview} />
+              ) : (
+                <span className="muted small">
+                  {uploading ? '上传中…' : '点击或拖拽图片到此处 · PNG / JPG / GIF / WEBP · ≤5MB'}
+                </span>
+              )}
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              hidden
+              onChange={handlePick}
+            />
+
+            {form.coverImage && (
+              <div className={styles.coverActions}>
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  重新选择
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-danger"
+                  disabled={uploading}
+                  onClick={() => patch({ coverImage: '' })}
+                >
+                  移除封面
+                </button>
+              </div>
             )}
           </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            hidden
-            onChange={handlePick}
-          />
-
-          {form.coverImage && (
-            <div className={styles.coverActions}>
-              <button
-                type="button"
-                className="btn btn-sm"
-                disabled={uploading}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                重新选择
-              </button>
-              <button
-                type="button"
-                className="btn btn-sm btn-danger"
-                disabled={uploading}
-                onClick={() => patch({ coverImage: '' })}
-              >
-                移除封面
-              </button>
-            </div>
-          )}
-        </div>
+        )}
 
         <div className="field">
-          <label htmlFor="content">正文</label>
+          <label htmlFor="content">
+            {form.postType === 'IMAGE' ? '正文说明' : '正文'}
+          </label>
           <textarea
             id="content"
-            className={styles.contentInput}
+            className={form.postType === 'IMAGE' ? styles.contentShort : styles.contentInput}
             maxLength={8000}
-            placeholder="写点什么…"
+            placeholder={form.postType === 'IMAGE' ? '补充这张图想说什么…' : '写点什么…'}
             value={form.content}
             onChange={(event) => patch({ content: event.target.value })}
           />
@@ -217,15 +285,40 @@ export default function PostEditorPage() {
           />
         </div>
 
+        <div className={`field ${styles.visibilityBox}`}>
+          <label className={styles.switchRow} htmlFor="private">
+            <input
+              id="private"
+              type="checkbox"
+              checked={form.visibility === VISIBILITY_PRIVATE}
+              onChange={(event) =>
+                patch({
+                  visibility: event.target.checked ? VISIBILITY_PRIVATE : VISIBILITY_PUBLIC
+                })
+              }
+            />
+            <span>
+              <strong>设为私密</strong>
+              <span className={`muted small ${styles.switchHint}`}>
+                只出现在你自己的个人中心，别人看不到，也不会进首页列表
+              </span>
+            </span>
+          </label>
+        </div>
+
         {error && <p className="error-text">{error}</p>}
 
         <div className={styles.actions}>
-          <button
-            className="btn btn-primary"
-            type="submit"
-            disabled={submitting || uploading}
-          >
-            {submitting ? '提交中…' : uploading ? '图片上传中…' : isEdit ? '保存修改' : '发布'}
+          <button className="btn btn-primary" type="submit" disabled={submitting || uploading}>
+            {submitting
+              ? '提交中…'
+              : uploading
+                ? '图片上传中…'
+                : isEdit
+                  ? '保存修改'
+                  : form.visibility === VISIBILITY_PRIVATE
+                    ? '私密发布'
+                    : '发布'}
           </button>
           <Link to="/posts" className="btn">
             取消

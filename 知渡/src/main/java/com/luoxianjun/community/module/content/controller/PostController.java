@@ -2,6 +2,7 @@ package com.luoxianjun.community.module.content.controller;
 
 import com.luoxianjun.community.common.result.PageResult;
 import com.luoxianjun.community.common.result.Result;
+import com.luoxianjun.community.module.content.dto.PostInteractionVO;
 import com.luoxianjun.community.module.content.dto.PostVO;
 import com.luoxianjun.community.module.content.dto.request.CreatePostRequest;
 import com.luoxianjun.community.module.content.dto.request.UpdatePostRequest;
@@ -53,5 +54,17 @@ public class PostController {
     public Result<Void> like(@PathVariable Long id) {
         postService.toggleLike(id);
         return Result.success();
+    }
+
+    /** 收藏 / 取消收藏，返回切换后的状态：true = 已收藏 */
+    @PostMapping("/{id}/favorite")
+    public Result<Boolean> favorite(@PathVariable Long id) {
+        return Result.success(postService.toggleFavorite(id));
+    }
+
+    /** 当前用户与该帖的交互状态（是否已赞 / 已收藏），未登录返回全 false */
+    @GetMapping("/{id}/interaction")
+    public Result<PostInteractionVO> interaction(@PathVariable Long id) {
+        return Result.success(postService.interaction(id));
     }
 }

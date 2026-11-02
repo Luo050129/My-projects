@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#132132"/>
+      <stop offset="100%" stop-color="#0d1420"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.78" cy="0.2" r="0.7">
+      <stop offset="0%" stop-color="#4f8cff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#4f8cff" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#2a3550" stroke-width="1" opacity="0.45"/>
+    </pattern>
+  </defs>
+  <rect width="800" height="450" fill="url(#bg)"/>
+  <rect width="800" height="450" fill="url(#grid)"/>
+  <rect width="800" height="450" fill="url(#glow)"/>
+  <circle cx="660" cy="120" r="86" fill="none" stroke="#4f8cff" stroke-width="2" opacity="0.5"/>
+  <circle cx="660" cy="120" r="52" fill="none" stroke="#4f8cff" stroke-width="1.5" opacity="0.35"/>
+  <g fill="none" stroke="#4f8cff" stroke-width="2" opacity="0.7">
+    <path d="M120 360h120l40-40h150"/>
+  </g>
+  <circle cx="430" cy="320" r="5" fill="#4f8cff"/>
+  <text x="64" y="240" fill="#e6e9ef" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="62" font-weight="700" letter-spacing="2">REDIS</text>
+  <text x="66" y="288" fill="#8fa3c8" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="20">缓存穿透 · 击穿 · 雪崩的实测记录</text>
+  <text x="66" y="392" fill="#4f8cff" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="15" letter-spacing="3">ZHIDU / CACHE</text>
+</svg>

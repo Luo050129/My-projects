@@ -61,6 +61,32 @@
 }
 
 .who {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 13px;
   color: var(--muted);
+}
+
+.who:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.whoActive {
+  color: var(--text);
+}
+
+.miniAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4f8cff, #7b5cff);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  user-select: none;
 }

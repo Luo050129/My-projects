@@ -10,6 +10,7 @@ const PostDetailPage = lazy(() => import('./pages/PostDetailPage'))
 const PostEditorPage = lazy(() => import('./pages/PostEditorPage'))
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
 const LoginPage = lazy(() => import('./pages/LoginPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 
 /**
  * 路由守卫。
@@ -56,6 +57,14 @@ export function AppRoutes() {
           element={
             <RequireAuth>
               <NotificationsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="me"
+          element={
+            <RequireAuth>
+              <ProfilePage />
             </RequireAuth>
           }
         />

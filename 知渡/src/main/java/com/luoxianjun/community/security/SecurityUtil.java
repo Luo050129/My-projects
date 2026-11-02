@@ -21,6 +21,20 @@ public final class SecurityUtil {
         return (Long) auth.getPrincipal();
     }
 
+    /**
+     * 取当前用户 id，未登录返回 null。
+     * <p>
+     * 公开接口（帖子列表、详情）需要「登录了就带上自己的视角，没登录也照常能看」，
+     * 这类场景不能用会抛异常的 currentUserId()。
+     */
+    public static Long currentUserIdOrNull() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof Long)) {
+            return null;
+        }
+        return (Long) auth.getPrincipal();
+    }
+
     public static boolean hasRole(String role) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth == null) {

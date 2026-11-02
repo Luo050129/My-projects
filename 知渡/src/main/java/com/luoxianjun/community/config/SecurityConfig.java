@@ -51,8 +51,13 @@ public class SecurityConfig {
                 .requestMatchers("/actuator/health", "/h2-console/**").permitAll()
                 // 内容读接口公开
                 .requestMatchers(HttpMethod.GET, "/posts", "/posts/*", "/comments/posts/**").permitAll()
+                // 用户公开主页与社交关系可匿名读（/user/page 另有 @PreAuthorize 兜住）
+                .requestMatchers(HttpMethod.GET, "/user/*", "/user/*/followers", "/user/*/followees")
+                    .permitAll()
                 // 上传的图片需公开可读（img 标签无法带 Authorization 头，必须放行 GET）
                 .requestMatchers(HttpMethod.GET, "/uploads/**").permitAll()
+                // 种子帖封面（随 jar 打包的静态资源）
+                .requestMatchers(HttpMethod.GET, "/seed/**").permitAll()
                 // 其余均需要登录
                 .anyRequest().authenticated()
             )

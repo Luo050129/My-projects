@@ -7,6 +7,7 @@ import com.luoxianjun.community.common.exception.BizException;
 import com.luoxianjun.community.common.exception.ErrorCode;
 import com.luoxianjun.community.common.result.PageResult;
 import com.luoxianjun.community.module.content.dto.CommentVO;
+import com.luoxianjun.community.module.content.dto.MyCommentVO;
 import com.luoxianjun.community.module.content.dto.request.CommentRequest;
 import com.luoxianjun.community.module.content.entity.Comment;
 import com.luoxianjun.community.module.content.entity.Post;
@@ -71,6 +72,27 @@ public class CommentServiceImpl implements CommentService {
                         .orderByAsc(Comment::getCreateTime));
         return PageResult.of(
                 page.getRecords().stream().map(this::toVO).toList(),
+                page.getTotal(), page.getCurrent(), page.getSize());
+    }
+
+    @Override
+    public PageResult<MyCommentVO> pageMyComments(long current, long size) {
+        Long me = SecurityUtil.currentUserId();
+        IPage<Comment> page = commentMapper.selectPage(
+                new Page<>(current, size),
+                new LambdaQueryWrapper<Comment>()
+                        .eq(Comment::getUserId, me)
+                        .eq(Comment::getDeleted, 0)
+                        .orderByDesc(Comment::getCreateTime));
+
+        return PageResult.of(
+                page.getRecords().stream().map(c -> {
+                    Post post = postMapper.selectById(c.getPostId());
+                    // 帖子可能已被删除：标题给个占位，评论本身仍然展示，用户能自己决定要不要清掉
+                    String title = post == null || Integer.valueOf(1).equals(post.getDeleted())
+                            ? "（帖子已删除）" : post.getTitle();
+                    return new MyCommentVO(c.getId(), c.getPostId(), title, c.getContent(), c.getCreateTime());
+                }).toList(),
                 page.getTotal(), page.getCurrent(), page.getSize());
     }
 

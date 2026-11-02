@@ -7,6 +7,84 @@
   min-height: 320px;
 }
 
+/* 图文帖正文只是配图说明，不需要那么高 */
+.contentShort {
+  min-height: 140px;
+}
+
+/* ---------- 样式选择 ---------- */
+.typeGroup {
+  display: flex;
+  gap: 10px;
+}
+
+.typeCard {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+
+.typeCard:hover {
+  border-color: #3a4150;
+}
+
+.typeCardActive {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+.typeLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.typeDesc {
+  font-size: 12px;
+}
+
+/* ---------- 私密开关 ---------- */
+.visibilityBox {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.switchRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.switchRow input {
+  margin-top: 3px;
+  accent-color: var(--accent);
+}
+
+.switchHint {
+  display: block;
+  margin-top: 2px;
+  font-weight: 400;
+}
+
 .counter {
   text-align: right;
   margin: 6px 0 0;

@@ -53,7 +53,18 @@ export function NavBar() {
         <div className={styles.right}>
           {isLoggedIn ? (
             <>
-              <span className={styles.who}>{user?.nickname || '用户'}</span>
+              <NavLink
+                to="/me"
+                className={({ isActive }) =>
+                  `${styles.who} ${isActive ? styles.whoActive : ''}`
+                }
+                title="个人中心"
+              >
+                <span className={styles.miniAvatar} aria-hidden="true">
+                  {(user?.nickname || '我').slice(0, 1)}
+                </span>
+                {user?.nickname || '用户'}
+              </NavLink>
               <button type="button" className="btn btn-sm" onClick={handleLogout}>
                 退出
               </button>

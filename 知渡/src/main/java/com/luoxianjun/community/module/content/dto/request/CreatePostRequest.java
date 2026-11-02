@@ -5,6 +5,9 @@ import jakarta.validation.constraints.Size;
 
 /**
  * 发布帖子请求。
+ * <p>
+ * postType / visibility 允许缺省：缺省时按「纯文字 + 公开」处理，
+ * 这样老客户端不改也能继续发帖。
  */
 public record CreatePostRequest(
         @NotBlank(message = "标题不能为空")
@@ -19,6 +22,12 @@ public record CreatePostRequest(
         String tags,
 
         @Size(max = 255, message = "封面图路径过长")
-        String coverImage
+        String coverImage,
+
+        /** TEXT 纯文字 / IMAGE 图文，为空按 TEXT */
+        String postType,
+
+        /** 0 公开 / 1 私密，为空按 0 */
+        Integer visibility
 ) {
 }

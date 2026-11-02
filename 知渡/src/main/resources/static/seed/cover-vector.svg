@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450">
+  <defs>
+    <linearGradient id="bg5" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#221833"/>
+      <stop offset="100%" stop-color="#120e1c"/>
+    </linearGradient>
+    <radialGradient id="glow5" cx="0.75" cy="0.3" r="0.75">
+      <stop offset="0%" stop-color="#a97bff" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#a97bff" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid5" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#3a2d55" stroke-width="1" opacity="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="800" height="450" fill="url(#bg5)"/>
+  <rect width="800" height="450" fill="url(#grid5)"/>
+  <rect width="800" height="450" fill="url(#glow5)"/>
+  <g stroke="#a97bff" stroke-width="1.6" fill="none" opacity="0.65">
+    <circle cx="620" cy="170" r="14"/>
+    <circle cx="700" cy="110" r="14"/>
+    <circle cx="700" cy="230" r="14"/>
+    <circle cx="620" cy="290" r="14"/>
+    <path d="M634 170l52-52M634 178l52 44M634 284l52-46"/>
+  </g>
+  <text x="64" y="230" fill="#e6e9ef" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="54" font-weight="700" letter-spacing="1">VECTOR DB</text>
+  <text x="66" y="280" fill="#b3a3d6" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="20">pgvector 检索质量到底怎么量</text>
+  <text x="66" y="392" fill="#a97bff" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="15" letter-spacing="3">ZHIDU / RAG</text>
+</svg>

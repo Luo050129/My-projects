@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
@@ -6,10 +6,16 @@ import {
   deletePost,
   enhancePost,
   fetchComments,
+  fetchInteraction,
   fetchPost,
-  toggleLike
+  fetchUserSummary,
+  followUser,
+  toggleFavorite,
+  toggleLike,
+  unfollowUser
 } from '../api/endpoints'
-import type { Comment, Post } from '../api/types'
+import type { Comment, Post, PostInteraction, UserSummary } from '../api/types'
+import { VISIBILITY_PRIVATE } from '../api/types'
 import { useAuth } from '../auth/useAuth'
 import { useToast } from '../components/ToastProvider'
 import { useAsync } from '../hooks/useAsync'
@@ -19,7 +25,11 @@ import styles from './PostDetailPage.module.css'
 interface DetailData {
   post: Post
   comments: Comment[]
+  interaction: PostInteraction
+  author: UserSummary | null
 }
+
+const ANON_INTERACTION: PostInteraction = { liked: false, favorited: false }
 
 export default function PostDetailPage() {
   const { id = '' } = useParams()
@@ -33,37 +43,88 @@ export default function PostDetailPage() {
 
   const { data, loading, error, reload, setData, setError } = useAsync<DetailData>(
     async (signal) => {
-      // 详情与评论并行取，首屏等待时间取两者较大值而不是相加
-      const [post, comments] = await Promise.all([
-        fetchPost(id, signal),
-        fetchComments(id, signal)
+      const post = await fetchPost(id, signal)
+      // 帖子拿到后再并发取评论、交互状态、作者摘要
+      const [commentsPage, interaction, author] = await Promise.all([
+        fetchComments(id, signal),
+        isLoggedIn ? fetchInteraction(id, signal) : Promise.resolve(ANON_INTERACTION),
+        fetchUserSummary(post.authorId, signal).catch(() => null)
       ])
-      return { post, comments }
+      return { post, comments: commentsPage.records ?? [], interaction, author }
     },
-    [id]
+    [id, isLoggedIn]
   )
 
   const post = data?.post ?? null
   const comments = data?.comments ?? []
+  const interaction = data?.interaction ?? ANON_INTERACTION
+  const author = data?.author ?? null
+
   const isOwner = Boolean(user && post && String(post.authorId) === String(user.userId))
-  const tags = splitTags(post?.tags)
+  const isPrivate = post?.visibility === VISIBILITY_PRIVATE
+  const tags = useMemo(() => splitTags(post?.tags), [post?.tags])
 
   const handleLike = async () => {
-    if (!post) return
+    if (!post || !data) return
     const snapshot = data
+    const nextLiked = !interaction.liked
 
-    // 乐观更新：先加一，交互立刻有反馈；接口失败再整体回滚
+    // 乐观更新：状态与计数一起改，点击立刻有反馈
     setData((prev) =>
-      prev ? { ...prev, post: { ...prev.post, likeCount: prev.post.likeCount + 1 } } : prev
+      prev
+        ? {
+            ...prev,
+            post: {
+              ...prev.post,
+              likeCount: Math.max(0, prev.post.likeCount + (nextLiked ? 1 : -1))
+            },
+            interaction: { ...prev.interaction, liked: nextLiked }
+          }
+        : prev
     )
 
     try {
       await toggleLike(post.id)
-      // 接口没有返回最新计数（可能是取消赞），重取一次把真实数字对齐
+      // 计数以服务端为准（并发点赞时本地加减可能偏），重新拉一次对齐
       reload()
     } catch (err) {
       setData(() => snapshot)
       setError(err instanceof Error ? err.message : '点赞失败')
+    }
+  }
+
+  const handleFavorite = async () => {
+    if (!post || !data) return
+    const snapshot = data
+    const nextFavorited = !interaction.favorited
+
+    setData((prev) =>
+      prev ? { ...prev, interaction: { ...prev.interaction, favorited: nextFavorited } } : prev
+    )
+
+    try {
+      const result = await toggleFavorite(post.id)
+      showToast(result ? '已收藏' : '已取消收藏', result ? 'ok' : 'info')
+      if (result !== nextFavorited) reload()
+    } catch (err) {
+      setData(() => snapshot)
+      setError(err instanceof Error ? err.message : '收藏失败')
+    }
+  }
+
+  const handleFollowAuthor = async () => {
+    if (!author) return
+    try {
+      if (author.following) {
+        await unfollowUser(author.id)
+        showToast(`已取消关注 ${author.nickname}`, 'info')
+      } else {
+        await followUser(author.id)
+        showToast(`已关注 ${author.nickname}`, 'ok')
+      }
+      reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '操作失败')
     }
   }
 
@@ -72,11 +133,7 @@ export default function PostDetailPage() {
     setEnhancing(true)
     try {
       const result = await enhancePost(post.id)
-      if (!result.safe) {
-        showToast('内容判定为不合规，未生成摘要', 'bad')
-      } else {
-        showToast('AI 摘要已生成', 'ok')
-      }
+      showToast(result.safe ? 'AI 摘要已生成' : '内容判定为不合规，未生成摘要', result.safe ? 'ok' : 'bad')
       reload()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'AI 摘要生成失败')
@@ -137,14 +194,28 @@ export default function PostDetailPage() {
 
       {post && (
         <>
+          {isPrivate && (
+            <p className={styles.privateBanner}>
+              这是一篇私密帖子，只有你自己能看到，不会出现在首页列表
+            </p>
+          )}
+
           <article className="panel">
             <h1 className={styles.title}>{post.title}</h1>
             <div className={styles.meta}>
               <span>{post.authorName}</span>
+              {author && !isOwner && isLoggedIn && (
+                <button type="button" className={styles.followBtn} onClick={handleFollowAuthor}>
+                  {author.following ? '已关注' : '+ 关注'}
+                </button>
+              )}
               <span className={styles.dot}>·</span>
               <span>{formatTime(post.createTime)}</span>
               <span className={styles.dot}>·</span>
               <span>{post.viewCount} 浏览</span>
+              {post.postType === 'IMAGE' && (
+                <span className={`tag ${styles.typeTag}`}>图文</span>
+              )}
             </div>
 
             {post.coverImage && (
@@ -165,12 +236,21 @@ export default function PostDetailPage() {
 
             <div className={styles.actions}>
               <button
-                className="btn"
+                className={`btn ${interaction.liked ? styles.btnActive : ''}`}
                 disabled={!isLoggedIn}
                 onClick={handleLike}
                 title={isLoggedIn ? '点赞' : '登录后可点赞'}
               >
-                {isLoggedIn ? '点赞' : '登录后可点赞'} · {post.likeCount}
+                {interaction.liked ? '已赞' : isLoggedIn ? '点赞' : '登录后可点赞'} ·{' '}
+                {post.likeCount}
+              </button>
+              <button
+                className={`btn ${interaction.favorited ? styles.btnActive : ''}`}
+                disabled={!isLoggedIn}
+                onClick={handleFavorite}
+                title={isLoggedIn ? '收藏' : '登录后可收藏'}
+              >
+                {interaction.favorited ? '已收藏' : '收藏'}
               </button>
               {isOwner && (
                 <>
@@ -225,7 +305,7 @@ export default function PostDetailPage() {
                 {comments.map((comment) => (
                   <li key={comment.id} className={styles.comment}>
                     <div className={styles.commentHead}>
-                      <span className={styles.author}>{comment.authorName}</span>
+                      <span className={styles.authorName}>{comment.authorName}</span>
                       <span className="muted small">{formatTime(comment.createTime)}</span>
                     </div>
                     <p className={styles.commentBody}>{comment.content}</p>

@@ -47,7 +47,9 @@ public class PostCacheService {
 
     /** 空标记专用哨兵（仅用于区分“缓存中不存在”与“真实不存在”） */
     private static final PostVO NULL_MARKER_VO = new PostVO(
-            -1L, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            -1L, null, null, null, null, null, null, null,
+            null, null, // postType, visibility
+            null, null, null, null, null, null);
 
     public boolean isNullMarker(PostVO vo) {
         return vo != null && vo.id() != null && vo.id() == -1L;

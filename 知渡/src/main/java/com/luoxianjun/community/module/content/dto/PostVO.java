@@ -4,6 +4,9 @@ import java.time.LocalDateTime;
 
 /**
  * 帖子视图对象。
+ * <p>
+ * 不含「当前用户是否点过赞 / 收藏过」这类用户态字段：详情会被缓存，
+ * 缓存里塞用户态会串号。用户态走 {@code GET /posts/{id}/interaction} 单独查。
  */
 public record PostVO(
         Long id,
@@ -16,6 +19,10 @@ public record PostVO(
         String tags,
         /** 封面图访问路径，可为空 */
         String coverImage,
+        /** TEXT 纯文字 / IMAGE 图文 */
+        String postType,
+        /** 0 公开 / 1 私密 */
+        Integer visibility,
         Integer status,
         Integer viewCount,
         Integer likeCount,

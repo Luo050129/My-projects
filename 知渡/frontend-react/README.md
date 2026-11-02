@@ -29,19 +29,37 @@ src/
 │   └── useDebouncedValue.ts
 ├── components/
 │   ├── Layout.tsx       NavBar + Suspense 骨架
-│   ├── NavBar.tsx       未读数随导航刷新
+│   ├── NavBar.tsx       未读数随导航刷新 + 个人中心入口
 │   ├── PostCard.tsx
+│   ├── Pager.tsx        分页条（列表页与个人中心共用）
 │   ├── ErrorBoundary.tsx
 │   └── ToastProvider.tsx
 ├── pages/
 │   ├── LoginPage.tsx
 │   ├── PostListPage.tsx
-│   ├── PostDetailPage.tsx
-│   ├── PostEditorPage.tsx
-│   └── NotificationsPage.tsx
+│   ├── PostDetailPage.tsx   点赞 / 收藏 / 关注作者 / AI 摘要
+│   ├── PostEditorPage.tsx   纯文字或图文 + 私密开关
+│   ├── NotificationsPage.tsx
+│   └── ProfilePage.tsx      个人中心：帖子 / 评论 / 点赞 / 收藏 / 关注 / 粉丝
 ├── styles/global.css    设计令牌 + 基础组件（与 Vue 版同一套视觉）
 └── main.tsx
 ```
+
+## 本轮新增功能
+
+| 功能 | 说明 |
+| --- | --- |
+| 个人中心 `/me` | 头部统计（帖子 / 获赞 / 粉丝 / 关注）+ 6 个 tab，数字可点击直接切到对应 tab |
+| 我的帖子 | 包含私密帖，右上角打「私密」标签；`includePrivate` 由后端按身份判定，前端传参不构成信任 |
+| 我的评论 | 带所属帖子标题，点标题直达原帖 |
+| 点赞 / 收藏 | 复用帖子卡片渲染，按点赞 / 收藏时间倒序 |
+| 关注 / 粉丝 | 用户列表 + 关注按钮，关注后同时刷新列表与顶部统计 |
+| 多种帖子样式 | 发布页可选「纯文字」或「图文」；图文必须有封面，正文输入框自动变矮成「正文说明」 |
+| 私密帖 | 发布页开关；私密帖不进首页列表、详情只有作者能打开；详情页顶部有橙色提示条 |
+| 收藏与点赞态 | 详情页独立查 `interaction` 拿「已赞 / 已收藏」状态，避免把用户态写进公共缓存 |
+
+同时修掉一个既有 bug：后端 `/comments/posts/{id}` 返回的是分页结构而非数组，
+旧前端直接当数组用，导致评论区永远显示「还没有评论」。现在按 `records` 取。
 
 ## 与 Vue 版的差异
 
@@ -59,6 +77,10 @@ src/
 | 路由守卫 | 全局 `beforeEach` + `meta.requiresAuth` | `RequireAuth` 组合组件，保护范围就近可见 |
 | 样式隔离 | `<style scoped>` | CSS Modules，类名编译期哈希 |
 | 打包 | 单一 chunk | React 运行时单独分包 + 路由级懒加载 |
+| 功能覆盖 | 登录 / 列表 / 详情 / 发帖 / 通知 | 在其基础上增加个人中心（6 个 tab）、关注、收藏、私密帖、图文/纯文字双样式 |
+
+> Vue 版停留在上一轮的功能范围，没有跟进个人中心与私密帖。两版共用同一套后端接口，
+> 需要补齐时可直接参照 `src/pages/ProfilePage.tsx` 与 `src/api/endpoints.ts`。
 
 ## 说明
 

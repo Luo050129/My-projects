@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450" width="800" height="450">
+  <defs>
+    <linearGradient id="bg2" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f2419"/>
+      <stop offset="100%" stop-color="#0c1512"/>
+    </linearGradient>
+    <radialGradient id="glow2" cx="0.2" cy="0.85" r="0.75">
+      <stop offset="0%" stop-color="#3ecf8e" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#3ecf8e" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid2" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#1f4436" stroke-width="1" opacity="0.5"/>
+    </pattern>
+  </defs>
+  <rect width="800" height="450" fill="url(#bg2)"/>
+  <rect width="800" height="450" fill="url(#grid2)"/>
+  <rect width="800" height="450" fill="url(#glow2)"/>
+  <g fill="none" stroke="#3ecf8e" stroke-width="2" opacity="0.65">
+    <rect x="520" y="90" width="180" height="120" rx="10"/>
+    <rect x="560" y="240" width="180" height="120" rx="10"/>
+    <path d="M610 210v30M650 210v30"/>
+  </g>
+  <text x="64" y="240" fill="#e6e9ef" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="58" font-weight="700" letter-spacing="1">SPRING AI</text>
+  <text x="66" y="288" fill="#8fc7ae" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="20">把大模型接进 Java 后端的三种姿势</text>
+  <text x="66" y="392" fill="#3ecf8e" font-family="Segoe UI, Microsoft YaHei, sans-serif" font-size="15" letter-spacing="3">ZHIDU / AI</text>
+</svg>

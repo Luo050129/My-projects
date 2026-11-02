@@ -63,13 +63,23 @@ cd frontend-react && npm install && npm run dev    # React 18 版 → http://loc
 - H2 控制台：`http://127.0.0.1:8088/h2-console`（JDBC URL：`jdbc:h2:file:./data/community`）
 - 健康检查：`GET /api/actuator/health`
 
-**种子账号**（首次启动自动初始化）：
+**种子账号**（首次启动自动初始化，缺失的会按需补齐）：
 
 | 用户名 | 密码 | 角色 |
 | --- | --- | --- |
 | admin | admin123 | ADMIN |
 | alice | alice123 | USER |
 | bob | bob123 | USER |
+| carol | carol123 | USER |
+| david | david123 | USER |
+| eve | eve123 | USER |
+
+同时灌入 18 篇帖子（8 篇图文 + 10 篇纯文字，其中 2 篇私密）、15 条评论、39 个点赞、8 条收藏、9 组关注关系，
+每段都按业务键判重，重复启动不会产生重复数据。种子封面是随 jar 打包的 SVG（`static/seed/`），
+所以 clone 下来不依赖任何外部图床就能看到完整页面。
+
+> 老库升级：`data/community.mv.db` 里已有数据时，`schema-h2.sql` 末尾的 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
+> 会补上新增列，种子数据则按「作者 + 标题」逐条补齐，不会覆盖已有内容。
 
 ### 接口示例
 
@@ -79,16 +89,31 @@ TOKEN=$(curl -s -X POST http://127.0.0.1:8088/api/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"admin123"}' | grep -o '"token":"[^"]*"' | sed 's/"token":"//;s/"//')
 
-# 发帖（需登录）
+# 发帖（需登录）；postType: TEXT 纯文字 / IMAGE 图文，visibility: 0 公开 / 1 私密
 curl -s -X POST http://127.0.0.1:8088/api/posts \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d '{"title":"Spring Boot 缓存实战","content":"讲解 Cache-Aside + 分布式锁防击穿"}'
+  -d '{"title":"Spring Boot 缓存实战","content":"讲解 Cache-Aside + 分布式锁防击穿","postType":"TEXT","visibility":0}'
 
-# 帖子详情（公开，走 Redis 缓存）
+# 帖子详情（公开，走 Redis 缓存；私密帖只有作者本人能读）
 curl -s http://127.0.0.1:8088/api/posts/1
 
 # AI 增强（无 Key 走规则降级，返回 summary / tags / safe）
 curl -s -X POST http://127.0.0.1:8088/api/ai/posts/1/enhance -H "Authorization: Bearer $TOKEN"
+
+# 个人中心：统计 / 我的帖子（含私密）/ 我的评论 / 点赞过 / 收藏过
+curl -s http://127.0.0.1:8088/api/me/stats -H "Authorization: Bearer $TOKEN"
+curl -s "http://127.0.0.1:8088/api/me/posts?current=1&size=10&includePrivate=true" -H "Authorization: Bearer $TOKEN"
+curl -s http://127.0.0.1:8088/api/me/comments -H "Authorization: Bearer $TOKEN"
+curl -s http://127.0.0.1:8088/api/me/likes -H "Authorization: Bearer $TOKEN"
+curl -s http://127.0.0.1:8088/api/me/favorites -H "Authorization: Bearer $TOKEN"
+
+# 收藏 / 取消收藏（返回切换后的状态）
+curl -s -X POST http://127.0.0.1:8088/api/posts/1/favorite -H "Authorization: Bearer $TOKEN"
+
+# 关注 / 取关、粉丝与关注列表
+curl -s -X POST http://127.0.0.1:8088/api/user/2/follow -H "Authorization: Bearer $TOKEN"
+curl -s http://127.0.0.1:8088/api/user/2/followers
+curl -s http://127.0.0.1:8088/api/user/2/followees
 ```
 
 ---
@@ -122,16 +147,22 @@ curl -s -X POST http://127.0.0.1:8088/api/ai/posts/1/enhance -H "Authorization: 
 | 表 | 作用 | 关键约束 |
 | --- | --- | --- |
 | `t_user` | 账号、密码、角色、状态 | `uk_user_username` 唯一 |
-| `t_post` | 帖子正文与冗余计数（浏览/点赞/评论） | `idx_post_user`、`idx_post_status_ctime` |
+| `t_post` | 帖子正文与冗余计数（浏览/点赞/评论）；`post_type` 区分纯文字/图文，`visibility` 控制私密 | `idx_post_user`、`idx_post_status_ctime`、`idx_post_visibility_ctime` |
 | `t_comment` | 评论，`parent_id` 支持两层结构 | `idx_comment_post` |
 | `t_post_like` | 点赞关系 | `uk_like_post_user` 唯一索引兜底幂等 |
+| `t_post_favorite` | 收藏关系 | `uk_favorite_post_user` 唯一索引兜底幂等 |
+| `t_user_follow` | 关注关系（`follower_id` → `followee_id`） | `uk_follow_pair` 唯一索引，重复关注幂等 |
 | `t_notification` | 站内通知 | `idx_notify_receiver` |
 
-三个设计取舍：
+五个设计取舍：
 
 1. **计数冗余在 `t_post` 上**（`like_count` / `comment_count` / `view_count`），避免列表页对明细表做聚合查询；代价是计数需要与明细保持一致，这一点在「难点二」里踩过坑。
 2. **逻辑删除**用 `deleted` 字段，配合 MyBatis-Plus `@TableLogic` 自动过滤。
 3. **表名统一 `t_` 前缀**，规避 MySQL 里 `user` / `post` / `comment` 这类保留字带来的转义麻烦。
+4. **私密可见性放在服务端判断，不靠前端隐藏**：列表查询带 `visibility = 0` 条件，详情与点赞/收藏都再校验一次作者身份，
+   非作者拿到的错误是「帖子不存在」而不是「无权访问」——不泄露资源是否存在。私密帖**不写 Redis 缓存**，
+   因为缓存是所有用户共享的，写进去等于泄露给下一个访问者。
+5. **关注/收藏与点赞同构**：都是「关系表 + 唯一索引」，靠数据库唯一约束实现幂等，而不是先查后插。
 
 ### 4.3 关键链路
 
@@ -418,7 +449,7 @@ java -jar zhidu-community.jar --spring.profiles.active=prod
 │   ├── security/                   # JWT 工具、过滤器、RBAC
 │   └── module/
 │       ├── user/                   # 用户与鉴权
-│       ├── content/                # 帖子/评论/点赞 + 缓存防击穿
+│       ├── content/                # 帖子/评论/点赞/收藏 + 缓存防击穿 + 个人中心聚合
 │       ├── notify/                 # 通知异步解耦（本地 / RabbitMQ）
 │       ├── file/                   # 图片上传（魔数校验 + UUID 落盘）
 │       └── ai/                     # DeepSeek 客户端 + 内容增强（降级）
@@ -427,18 +458,19 @@ java -jar zhidu-community.jar --spring.profiles.active=prod
 │   └── uploads/yyyy/MM/            # 上传的图片（运行时生成）
 ├── src/main/resources
 │   ├── application.yml / -local.yml / -prod.yml / -test.yml
+│   ├── static/seed/                # 种子帖封面 SVG（随 jar 打包，保证 clone 即有图）
 │   └── db/
 │       ├── schema-h2.sql
 │       └── schema-mysql.sql
-├── frontend/                       # Vue 3 + Vite 前端（独立工程）
+├── frontend/                       # Vue 3 + Vite 前端（独立工程，未跟进本轮新功能）
 │   ├── src/views/                  # 登录 / 列表 / 详情 / 编辑 / 通知
 │   ├── src/api.js                  # 接口封装（自动带 JWT）
 │   └── README.md                   # 前端说明与部署方式
-├── frontend-react/                 # React 18 + TypeScript 前端（独立工程）
+├── frontend-react/                 # React 18 + TypeScript 前端（独立工程，功能最全）
 │   ├── src/api/                    # 请求层 + DTO 类型 + 接口清单
 │   ├── src/auth/                   # Context + useReducer 的登录态
 │   ├── src/hooks/                  # useAsync / useDebouncedValue
-│   ├── src/pages/                  # 与 Vue 版一一对应的五个页面
+│   ├── src/pages/                  # 列表 / 详情 / 编辑 / 通知 / 登录 / 个人中心
 │   └── README.md                   # React 版说明与差异对照
 └── src/test/                       # 单测 + 依赖真实 Redis 的集成测试
 ```

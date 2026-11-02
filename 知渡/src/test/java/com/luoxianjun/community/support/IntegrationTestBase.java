@@ -91,7 +91,8 @@ public abstract class IntegrationTestBase {
 
     protected Long newPost() {
         return postService.createPost(
-                new CreatePostRequest("并发测试帖", "用于验证缓存防击穿与点赞幂等的正文", null, null));
+                new CreatePostRequest("并发测试帖", "用于验证缓存防击穿与点赞幂等的正文", null, null,
+                        "TEXT", 0));
     }
 
     protected int likeRows(Long postId) {

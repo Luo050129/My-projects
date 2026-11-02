@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS t_post (
     summary       VARCHAR(500)  NULL                    COMMENT 'AI 摘要',
     tags          VARCHAR(255)  NULL                    COMMENT '标签，逗号分隔',
     cover_image   VARCHAR(255)  NULL                    COMMENT '封面图访问路径',
+    post_type     VARCHAR(20)   NOT NULL DEFAULT 'TEXT' COMMENT '帖子形态：TEXT 纯文字 / IMAGE 图文',
+    visibility    TINYINT       NOT NULL DEFAULT 0      COMMENT '可见性：0 公开 / 1 私密（仅作者可见）',
     status        TINYINT       NOT NULL DEFAULT 1      COMMENT '1 已发布 0 草稿',
     view_count    INT           NOT NULL DEFAULT 0      COMMENT '浏览量',
     like_count    INT           NOT NULL DEFAULT 0      COMMENT '点赞数',
@@ -45,7 +47,8 @@ CREATE TABLE IF NOT EXISTS t_post (
     update_time   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_post_user (user_id),
-    KEY idx_post_status_ctime (status, create_time DESC)
+    KEY idx_post_status_ctime (status, create_time DESC),
+    KEY idx_post_visibility_ctime (visibility, create_time DESC)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '帖子表';
 
 CREATE TABLE IF NOT EXISTS t_comment (
@@ -83,4 +86,34 @@ CREATE TABLE IF NOT EXISTS t_notification (
     PRIMARY KEY (id),
     KEY idx_notify_receiver (receiver_id, read_status)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '通知表';
+
+CREATE TABLE IF NOT EXISTS t_user_follow (
+    id          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    follower_id BIGINT   NOT NULL                COMMENT '关注发起者',
+    followee_id BIGINT   NOT NULL                COMMENT '被关注者',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_follow_pair (follower_id, followee_id) COMMENT '重复关注幂等',
+    KEY idx_follow_followee (followee_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '用户关注表';
+
+CREATE TABLE IF NOT EXISTS t_post_favorite (
+    id          BIGINT   NOT NULL AUTO_INCREMENT COMMENT '主键',
+    post_id     BIGINT   NOT NULL                COMMENT '帖子 id',
+    user_id     BIGINT   NOT NULL                COMMENT '收藏人 id',
+    create_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_favorite_post_user (post_id, user_id) COMMENT '一人一收藏',
+    KEY idx_favorite_user (user_id)
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci COMMENT = '帖子收藏表';
+
+-- ------------------------------------------------------------
+-- 增量迁移（老库升级时人工执行；MySQL 不支持 ADD COLUMN IF NOT EXISTS，
+-- 重复执行会报 duplicate column，属于预期，可忽略）
+-- ------------------------------------------------------------
+-- ALTER TABLE t_post
+--     ADD COLUMN post_type  VARCHAR(20) NOT NULL DEFAULT 'TEXT' COMMENT 'TEXT 纯文字 / IMAGE 图文',
+--     ADD COLUMN visibility TINYINT     NOT NULL DEFAULT 0      COMMENT '0 公开 / 1 私密',
+--     ADD KEY idx_post_visibility_ctime (visibility, create_time DESC);
+
 
