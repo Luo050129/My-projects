@@ -52,7 +52,8 @@ public class PostCacheService {
     private static final PostVO NULL_MARKER_VO = new PostVO(
             -1L, null, null, null, null, null, null, null,
             null, null, // postType, visibility
-            null, null, null, null, null, null);
+            null, null, null, null, null, null,
+            null, null); // aiGenerated, reviewStatus
 
     public boolean isNullMarker(PostVO vo) {
         return vo != null && vo.id() != null && vo.id() == -1L;

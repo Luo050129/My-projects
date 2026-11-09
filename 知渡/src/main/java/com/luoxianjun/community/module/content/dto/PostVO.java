@@ -28,6 +28,10 @@ public record PostVO(
         Integer likeCount,
         Integer commentCount,
         Integer aiEnhanced,
+        /** 作者声明 AI 生成 / 辅助创作（显式标识，前端据此展示徽标） */
+        Boolean aiGenerated,
+        /** 审核状态：0 免审 / 1 待审 / 2 通过 / 3 驳回 */
+        Integer reviewStatus,
         LocalDateTime createTime
 ) {
 }

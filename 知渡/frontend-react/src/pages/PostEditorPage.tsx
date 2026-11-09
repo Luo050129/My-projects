@@ -15,6 +15,7 @@ interface FormState {
   coverImage: string
   postType: PostType
   visibility: number
+  aiGenerated: boolean
 }
 
 const EMPTY: FormState = {
@@ -23,7 +24,8 @@ const EMPTY: FormState = {
   tags: '',
   coverImage: '',
   postType: 'TEXT',
-  visibility: VISIBILITY_PUBLIC
+  visibility: VISIBILITY_PUBLIC,
+  aiGenerated: false
 }
 
 const TYPE_OPTIONS: { value: PostType; label: string; desc: string }[] = [
@@ -57,7 +59,8 @@ export default function PostEditorPage() {
           tags: post.tags ?? '',
           coverImage: post.coverImage ?? '',
           postType: post.postType ?? 'TEXT',
-          visibility: post.visibility ?? VISIBILITY_PUBLIC
+          visibility: post.visibility ?? VISIBILITY_PUBLIC,
+          aiGenerated: post.aiGenerated ?? false
         })
       })
       .catch((err: unknown) => {
@@ -135,7 +138,8 @@ export default function PostEditorPage() {
       tags: form.tags.trim(),
       coverImage: form.postType === 'IMAGE' ? form.coverImage || null : null,
       postType: form.postType,
-      visibility: form.visibility
+      visibility: form.visibility,
+      aiGenerated: form.aiGenerated
     }
 
     setSubmitting(true)
@@ -301,6 +305,23 @@ export default function PostEditorPage() {
               <strong>设为私密</strong>
               <span className={`muted small ${styles.switchHint}`}>
                 只出现在你自己的个人中心，别人看不到，也不会进首页列表
+              </span>
+            </span>
+          </label>
+        </div>
+
+        <div className={`field ${styles.visibilityBox}`}>
+          <label className={styles.switchRow} htmlFor="ai-generated">
+            <input
+              id="ai-generated"
+              type="checkbox"
+              checked={form.aiGenerated}
+              onChange={(event) => patch({ aiGenerated: event.target.checked })}
+            />
+            <span>
+              <strong>内容由 AI 生成或辅助创作</strong>
+              <span className={`muted small ${styles.switchHint}`}>
+                依《人工智能生成合成内容标识办法》主动声明；发布后会在列表与详情展示「AI 辅助创作」标识
               </span>
             </span>
           </label>

@@ -14,6 +14,8 @@ import type {
   Post,
   PostInteraction,
   PostPayload,
+  GovernanceInfo,
+  ReportItem,
   UploadResult,
   UserProfile,
   UserStats,
@@ -159,3 +161,24 @@ export const readAllNotifications = (signal?: AbortSignal) =>
 // ---------- 文件 ----------
 export const uploadImage = (file: File, signal?: AbortSignal) =>
   upload<UploadResult>('/files/upload', file, signal)
+
+// ---------- 内容治理 ----------
+/** 单帖治理视图：显式标识、审核状态、隐式声明元数据 */
+export const fetchGovernance = (postId: string | number, signal?: AbortSignal) =>
+  request<GovernanceInfo>(`/governance/posts/${postId}`, { signal })
+
+/** 举报帖子：后端会登记举报单并把帖子送进审核队列 */
+export const submitReport = (postId: number, reason: string, signal?: AbortSignal) =>
+  request<number>('/reports', { method: 'POST', body: { postId, reason }, signal })
+
+/** 我发起的举报 */
+export const fetchMyReports = (current = 1, size = 20, signal?: AbortSignal) =>
+  request<PageResult<ReportItem>>(`/reports/mine?current=${current}&size=${size}`, { signal })
+
+/** 作者对被驳回内容发起申诉 */
+export const appealPost = (postId: number, text: string, signal?: AbortSignal) =>
+  request<void>(`/governance/posts/${postId}/appeal`, {
+    method: 'POST',
+    body: { text },
+    signal
+  })

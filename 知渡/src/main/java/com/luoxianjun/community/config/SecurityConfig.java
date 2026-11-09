@@ -3,6 +3,7 @@ package com.luoxianjun.community.config;
 import com.luoxianjun.community.security.JwtAuthFilter;
 import com.luoxianjun.community.security.RestAuthenticationEntryPoint;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -18,6 +19,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -31,6 +33,13 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
+
+    /**
+     * 生产必须显式注入 CORS_ALLOWED_ORIGINS。
+     * 原先 allowedOriginPatterns("*") + allowCredentials(true) 等于允许任意站点携带凭据跨源请求。
+     */
+    @Value("${community.cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -49,6 +58,8 @@ public class SecurityConfig {
                 // 公开接口：认证、健康检查、H2 控制台
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers("/actuator/health", "/h2-console/**").permitAll()
+                // 接口文档（prod 由 springdoc.enabled=false 关闭，放行不会造成暴露）
+                .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 // 内容读接口公开
                 // /posts/* 只匹配单段，三段路径必须显式列出，否则匿名读交互态会被 401
                 .requestMatchers(HttpMethod.GET, "/posts", "/posts/*", "/posts/*/interaction", "/comments/posts/**").permitAll()
@@ -70,8 +81,12 @@ public class SecurityConfig {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
         CorsConfiguration cfg = new CorsConfiguration();
-        cfg.setAllowedOriginPatterns(List.of("*"));
+        cfg.setAllowedOriginPatterns(origins);
         cfg.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         cfg.setAllowedHeaders(List.of("*"));
         cfg.setAllowCredentials(true);

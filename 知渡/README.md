@@ -10,7 +10,7 @@
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.7-3178c6?logo=typescript&logoColor=white">
 </p>
 
-> 一个面向内容社区场景的全栈项目。围绕「读多写少、热点集中、写操作需幂等、外部模型不可靠」这四类典型特征做设计，
+> 一个按生产标准维护的内容 / 知识社区全栈项目。围绕「读多写少、热点集中、写操作需幂等、外部模型不可靠」这四类典型特征做设计，
 > 覆盖鉴权、内容、互动、通知与 AI 内容增强五个领域，并保证在**不装 MySQL / RabbitMQ** 的本地环境下也能完整跑起来。
 
 ---
@@ -20,7 +20,18 @@
 > 消费端按业务键判重、点赞/收藏并发幂等、评论与浏览量原子计数、AI 合规不通过时跳过写回、
 > `GET /posts/{id}/interaction` 匿名可读、客户端异常收敛为 4xx、限流 Lua 原子化且 Redis 故障 fail-open。
 > 同时修掉三类实际缺陷：评论越权、Vue 版评论区/通知页失效、prod 启动阻断。
-> 仍未实现的部分（MQ publisher confirm / 手动 ACK / 死信、AI 真实调用契约、Flyway、OpenAPI、CI）在第九节如实标注。
+> 仍未实现的部分（MQ publisher confirm / 手动 ACK / 死信、AI 真实调用契约）在第九节如实标注；
+> Flyway、OpenAPI、CI 已于同日第三轮补齐。
+
+> **正式项目化（2026-11-09 第三轮）**：项目定位由「学习 / 作品」调整为按生产标准维护的正式项目，本轮落地：
+> ① **Flyway** 接管表结构（`db/migration/V1__baseline.sql` 双方言基线 + `V2__content_governance.sql`），
+> 老库通过 `baseline-on-migrate` 平滑接入，取代 `spring.sql.init` 与手工 `ALTER ... IF NOT EXISTS`；
+> ② **springdoc OpenAPI**（`/swagger-ui.html`，prod 关闭）与 **GitHub Actions CI**（后端 verify + 双前端 build）；
+> ③ **内容可信治理**：对标《人工智能生成合成内容标识办法》与 GB 45438—2025，落地 AI 显式标识、
+> 隐式声明元数据、发帖/编辑规则拦截、审核状态机、举报、申诉、审计留痕；待审 / 驳回内容对非作者一律不可见，
+> 贯穿列表、详情、评论、点赞、收藏、赞过与收藏过列表；
+> ④ CORS 由 `*` 收紧为白名单（`CORS_ALLOWED_ORIGINS`），React 前端接入标识展示与举报 / 申诉。
+> 仍待办：全文 / 语义检索、标签话题、关注 Feed、站内 RAG 问答。
 
 ## 界面预览
 
@@ -129,8 +140,9 @@ cd frontend-react && npm install && npm run dev    # React 18 版 → http://loc
 每段都按业务键判重，重复启动不会产生重复数据。种子封面是随 jar 打包的 SVG（`static/seed/`），
 所以 clone 下来不依赖任何外部图床就能看到完整页面。
 
-> 老库升级：`data/community.mv.db` 里已有数据时，`schema-h2.sql` 末尾的 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
-> 会补上新增列，种子数据则按「作者 + 标题」逐条补齐，不会覆盖已有内容。
+> 老库升级：表结构已由 Flyway 接管。`data/community.mv.db` 里已有数据时，首次启动会
+> `baseline-on-migrate` 到 V1 并只叠加增量版本（实测：baselined with version 1 → applied V2）；
+> 种子数据仍按「作者 + 标题」逐条补齐，不会覆盖已有内容。
 
 ### 接口示例
 
@@ -367,6 +379,10 @@ JdbcSQLSyntaxErrorException: Index "idx_post_user" already exists
 
 **验证**：重建后连续启动两次，健康检查均为 `UP`。
 
+> 注：以上为引入 Flyway 之前的历史复盘。现在表结构由 `db/migration/` 的版本化脚本管理，
+> Flyway 用 `flyway_schema_history` 保证每个版本只执行一次，不再依赖 `IF NOT EXISTS` 幂等技巧；
+> 两个旧 schema 脚本保留作方言参考，不再被应用加载。
+
 ### 难点四：`context-path` 与安全规则的前缀错位
 
 **现象**：配置 `context-path=/api` 后，除登录外全部接口返回 401。
@@ -424,7 +440,7 @@ JdbcSQLSyntaxErrorException: Index "idx_post_user" already exists
 mvn test
 ```
 
-共 **31 个用例 / 7 个测试类**，分两类（本轮新增 `CommentVisibilityIntegrationTest` 4 例、`JwtTokenProviderTest` 2 例）。
+共 **37 个用例 / 8 个测试类**，分两类（第三轮新增 `GovernanceIntegrationTest` 6 例）。
 
 ### 纯单测（17 例，离线可跑）
 
@@ -434,7 +450,7 @@ mvn test
 | `ContentAiServiceTest` | 无 Key 时规则降级、敏感词判定、长文摘要截断 |
 | `FileStorageServiceTest` | 魔数识别、伪装类型拒绝、路径穿越免疫、体积上限、1 字节文件不越界 |
 
-### 集成测试（14 例，需要真实 Redis；`test` profile 用 H2 内存库）
+### 集成测试（20 例，需要真实 Redis；`test` profile 用 H2 内存库）
 
 | 测试类 | 覆盖点 | 核心断言 |
 | --- | --- | --- |
@@ -442,6 +458,7 @@ mvn test
 | `PostCacheBreakdownIntegrationTest` | 命中不回源、并发防击穿、空值防穿透 | 20 并发未命中后 DB 浏览量仍为 1 |
 | `LikeIdempotencyIntegrationTest` | 点赞 toggle、并发计数一致、唯一索引兜底 | `like_count` 恒等于点赞表真实行数 |
 | `CommentVisibilityIntegrationTest` | 私密帖评论/列表越权、并发评论计数一致 | 非作者拿到「帖子不存在」；`comment_count` 恒等于评论表真实行数 |
+| `GovernanceIntegrationTest` | 规则拦截与可见性、审核通过/驳回、申诉状态机、举报去重、私密集报被拒、ADMIN 接口鉴权 | 待审帖对非作者恒为「帖子不存在」；非法状态流转被拒；USER 访问 `/admin/reviews` 返回 403 |
 
 **为什么集成测试值得写**：缓存击穿和计数一致性这两类问题，用 mock 验证不了——mock 不会有并发竞争。只有连真实 Redis + 真实事务边界，才能复现出来。这两条测试也正是发现「难点一」「难点二」的直接原因。
 
@@ -458,6 +475,9 @@ mvn test
 > prod 空 JWT 密钥无提示崩溃、prod 灌入弱口令种子账号、缓存雪崩无随机化、AI 超时是死配置、
 > `community.mq.type` 是死配置、点赞无通知、消费端无判重、AI 合规结果无处置、
 > 客户端异常误报 500、限流非原子且 Redis 故障拖垮登录、匿名读交互态被 401。
+>
+> **第三轮（同日）另已补齐且不再计入不足**：Flyway 版本化迁移、springdoc OpenAPI、
+> GitHub Actions CI、CORS 白名单、内容审核状态机与 AI 生成内容标识、举报与申诉通道、治理审计留痕。
 
 | # | 不足 | 影响 | 改进方向 |
 | --- | --- | --- | --- |
@@ -466,14 +486,14 @@ mvn test
 | 3 | **图片存本地磁盘，无法水平扩展** | 多实例部署时，A 节点上传的图在 B 节点查不到，只能靠网关做会话粘滞兜底 | 抽 `FileStorageService` 接口，加对象存储（OSS / S3 / MinIO）实现 |
 | 4 | **图片无压缩与缩略图** | 原图直出，列表页 112×78 的缩略位也在拉整张图，手机拍的照片单张 3–5MB，流量浪费明显 | 上传时生成多尺寸或接入图片处理服务；列表改用 `?w=240` 变体 |
 | 5 | **删帖不回收图片文件** | 帖子删了，`data/uploads` 里的图还在，长期会积累孤儿文件 | 删帖时按 `coverImage` 反查删除；或定期跑对账任务清理无引用文件 |
-| 6 | **缺少接口文档** | 没有 OpenAPI / Swagger，接口只能看代码或 curl | 接入 springdoc-openapi |
-| 7 | **缺少数据库迁移工具** | schema 靠手工执行脚本，无版本管理，多环境部署容易漂移（本次加 `cover_image` 就是靠手写 `ALTER ... IF NOT EXISTS` 顶上的） | 引入 Flyway 或 Liquibase |
-| 8 | **功能面偏窄** | 只有帖子 / 评论 / 点赞 / 通知 / 单图封面，缺搜索、关注与 feed 流、标签体系、内容审核流、富文本与正文内嵌图 | 按业务价值逐步补齐，优先做 feed 与搜索 |
+| 6 | ~~缺少接口文档~~ **已补齐** | springdoc-openapi 已接入，dev/test 可访问 `/swagger-ui.html`，prod 关闭 | — |
+| 7 | ~~缺少数据库迁移工具~~ **已补齐** | Flyway 接管 V1/V2 迁移，老库 baseline 平滑接入，H2 与 MySQL 共用一份双方言脚本 | — |
+| 8 | **功能面仍偏窄** | 内容审核流与 AI 标识已补齐；仍缺全文 / 语义检索、关注 feed、标签体系、富文本、站内 RAG 问答 | 按「检索分发 → AI 差异化」路线逐步补齐 |
 | 9 | **压测数据说服力有限** | 单机共机 + H2 内存库，缓存收益无法在本地量化 | 接网络 MySQL 后重测，区分冷/热缓存场景 |
 | 10 | **上传无病毒扫描与 EXIF 剥离** | 魔数只能确认「这是个图片」，无法排除图片解析器漏洞利用；EXIF 里可能带拍摄地点与设备信息 | 接入 ClamAV；上传时重编码以剥离元数据 |
 | 11 | **JWT 无刷新与吊销机制** | 签发后只能等过期，无法主动失效 | 引入 refresh token + Redis 存 jti 黑名单 |
 | 12 | ~~同一用户并发点赞会撞唯一索引~~ **本轮已修复** | 点赞/收藏均捕获 `DuplicateKeyException` 转为幂等成功，并加回归测试 | — |
-| 13 | **无 CI/CD** | 没有流水线，测试与构建靠本地手动执行 | 接入 GitHub Actions：编译 + 单测 + 集成测试 |
+| 13 | ~~无 CI/CD~~ **已补齐** | `.github/workflows/zhidu.yml`：后端 `mvn verify`（含 Redis service）+ Vue/React 构建，路径限定 `知渡/**` | — |
 
 ---
 
@@ -488,8 +508,9 @@ java -jar zhidu-community.jar --spring.profiles.active=prod
 
 要点：
 
-- 表结构用 `src/main/resources/db/schema-mysql.sql`（MySQL 8 语法，与 H2 版字段一一对应；
-  索引与唯一键内联声明，表已存在时整句跳过，脚本可重复执行）。
+- 表结构由 Flyway 在启动时自动迁移：`src/main/resources/db/migration/` 的 V1 基线 + V2 治理脚本
+  是一份双方言 DDL（同时兼容 H2 MySQL 模式与 MySQL 8）。全新库从 V1 执行；已有库自动 baseline 到 V1 后只叠加增量。
+  `db/schema-mysql.sql` 保留作方言参考，不再需要人工执行。
 - `community.mq.type=rabbitmq` 启用 MQ 发布消费；`community.ai.api-key` 注入 DeepSeek Key 启用真实模型。
 - JWT 密钥务必通过环境变量注入，不要提交到仓库；未注入或短于 32 字节时启动期 fail-fast 并给出提示（配置项见 `.env.example`）。
 
@@ -497,20 +518,23 @@ java -jar zhidu-community.jar --spring.profiles.active=prod
 
 ## 十一、目录结构
 
+> CI 流水线在合集仓库根 `.github/workflows/zhidu.yml`（git 根在父目录「合集」），路径过滤为 `知渡/**`。
+
 ```
 知渡/
 ├── pom.xml
 ├── benchmark.py                    # 压测脚本
 ├── src/main/java/com/luoxianjun/community
 │   ├── common/                     # 统一响应、异常、Redis 锁、限流注解/切面
-│   ├── config/                     # MyBatis-Plus 分页、异步(虚拟线程)、Security、数据源
+│   ├── config/                     # 分页、异步(虚拟线程)、Security、OpenAPI、数据源
 │   ├── security/                   # JWT 工具、过滤器、RBAC
 │   └── module/
 │       ├── user/                   # 用户与鉴权
 │       ├── content/                # 帖子/评论/点赞/收藏 + 缓存防击穿 + 个人中心聚合
 │       ├── notify/                 # 通知异步解耦（本地 / RabbitMQ）
 │       ├── file/                   # 图片上传（魔数校验 + UUID 落盘）
-│       └── ai/                     # DeepSeek 客户端 + 内容增强（降级）
+│       ├── ai/                     # DeepSeek 客户端 + 内容增强（降级）
+│       └── governance/             # 规则拦截、审核状态机、举报 / 申诉、审计留痕
 ├── data/
 │   ├── community.mv.db             # H2 文件库（运行时生成）
 │   └── uploads/yyyy/MM/            # 上传的图片（运行时生成）
@@ -518,8 +542,11 @@ java -jar zhidu-community.jar --spring.profiles.active=prod
 │   ├── application.yml / -local.yml / -prod.yml / -test.yml
 │   ├── static/seed/                # 种子帖封面 SVG（随 jar 打包，保证 clone 即有图）
 │   └── db/
-│       ├── schema-h2.sql
-│       └── schema-mysql.sql
+│       ├── migration/
+│       │   ├── V1__baseline.sql              # 双方言基线（表结构唯一真相源）
+│       │   └── V2__content_governance.sql    # AI 标识 + 审核 / 举报 / 申诉 / 审计
+│       ├── schema-h2.sql                     # 历史参考，不再加载
+│       └── schema-mysql.sql                  # 历史参考，不再加载
 ├── frontend/                       # Vue 3 + Vite 前端（独立工程，未跟进本轮新功能）
 │   ├── src/views/                  # 登录 / 列表 / 详情 / 编辑 / 通知
 │   ├── src/api.js                  # 接口封装（自动带 JWT）

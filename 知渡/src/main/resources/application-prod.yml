@@ -5,9 +5,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
-  sql:
-    init:
-      mode: never   # 生产表结构由 Flyway/Liquibase 或 DBA 管理
+  # 表结构统一由 Flyway 管理：已有库自动 baseline 到 V1，再叠加增量版本
 
   data:
     redis:
@@ -31,3 +29,10 @@ community:
     expiration-minutes: 120
   ai:
     api-key: ${DEEPSEEK_API_KEY:}
+
+# 生产不暴露接口文档与交互式 SQL 控制台
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false

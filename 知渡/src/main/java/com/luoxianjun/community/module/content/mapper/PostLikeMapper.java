@@ -23,6 +23,7 @@ public interface PostLikeMapper extends BaseMapper<PostLike> {
             WHERE l.user_id = #{userId}
               AND p.deleted = 0 AND p.status = 1
               AND (p.visibility = 0 OR p.user_id = #{userId})
+              AND p.review_status IN (0, 2)
             ORDER BY l.create_time DESC
             """)
     IPage<Post> pageLikedByUser(IPage<Post> page, @Param("userId") Long userId);

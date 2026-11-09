@@ -3,6 +3,7 @@ import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   addComment,
+  appealPost,
   deletePost,
   enhancePost,
   fetchComments,
@@ -10,6 +11,7 @@ import {
   fetchPost,
   fetchUserSummary,
   followUser,
+  submitReport,
   toggleFavorite,
   toggleLike,
   unfollowUser
@@ -63,6 +65,42 @@ export default function PostDetailPage() {
   const isOwner = Boolean(user && post && String(post.authorId) === String(user.userId))
   const isPrivate = post?.visibility === VISIBILITY_PRIVATE
   const tags = useMemo(() => splitTags(post?.tags), [post?.tags])
+
+  // 举报与申诉共用一个轻量面板：两者都是「提交一段说明 + 等待管理员处理」
+  const [governanceOpen, setGovernanceOpen] = useState<'report' | 'appeal' | null>(null)
+  const [governanceText, setGovernanceText] = useState('')
+  const [governanceBusy, setGovernanceBusy] = useState(false)
+
+  const openGovernance = (mode: 'report' | 'appeal') => {
+    setGovernanceText('')
+    setGovernanceOpen(mode)
+  }
+
+  const submitGovernance = async () => {
+    if (!post || !governanceOpen) return
+    const text = governanceText.trim()
+    if (!text) {
+      showToast('请填写说明', 'info')
+      return
+    }
+    setGovernanceBusy(true)
+    try {
+      if (governanceOpen === 'report') {
+        await submitReport(post.id, text)
+        showToast('举报已提交，等待管理员处理', 'ok')
+      } else {
+        await appealPost(post.id, text)
+        showToast('申诉已提交，等待复核', 'ok')
+      }
+      setGovernanceOpen(null)
+      setGovernanceText('')
+      reload()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '提交失败')
+    } finally {
+      setGovernanceBusy(false)
+    }
+  }
 
   const handleLike = async () => {
     if (!post || !data) return
@@ -199,6 +237,16 @@ export default function PostDetailPage() {
               这是一篇私密帖子，只有你自己能看到，不会出现在首页列表
             </p>
           )}
+          {post.reviewStatus === 1 && (
+            <p className={styles.privateBanner}>
+              内容审核中，仅你与管理员可见，暂不进入公开列表
+            </p>
+          )}
+          {post.reviewStatus === 3 && (
+            <p className={styles.privateBanner}>
+              内容未通过审核，仅你可见；可在下方发起申诉
+            </p>
+          )}
 
           <article className="panel">
             <h1 className={styles.title}>{post.title}</h1>
@@ -215,6 +263,9 @@ export default function PostDetailPage() {
               <span>{post.viewCount} 浏览</span>
               {post.postType === 'IMAGE' && (
                 <span className={`tag ${styles.typeTag}`}>图文</span>
+              )}
+              {post.aiGenerated && (
+                <span className={`tag ${styles.typeTag}`}>AI 辅助创作</span>
               )}
             </div>
 
@@ -252,6 +303,16 @@ export default function PostDetailPage() {
               >
                 {interaction.favorited ? '已收藏' : '收藏'}
               </button>
+              {isLoggedIn && !isOwner && (
+                <button className="btn" onClick={() => openGovernance('report')}>
+                  举报
+                </button>
+              )}
+              {isOwner && post.reviewStatus === 3 && (
+                <button className="btn" onClick={() => openGovernance('appeal')}>
+                  申诉
+                </button>
+              )}
               {isOwner && (
                 <>
                   <button className="btn" onClick={handleEnhance} disabled={enhancing}>
@@ -274,6 +335,42 @@ export default function PostDetailPage() {
               </p>
             )}
           </article>
+
+          {governanceOpen && (
+            <section className="panel">
+              <h2 className={styles.sectionTitle}>
+                {governanceOpen === 'report' ? '举报该内容' : '发起申诉'}
+              </h2>
+              <textarea
+                value={governanceText}
+                maxLength={500}
+                style={{ width: '100%', minHeight: 90 }}
+                placeholder={
+                  governanceOpen === 'report'
+                    ? '请说明举报原因，便于管理员复核'
+                    : '请说明申诉理由，例如已修改相关内容'
+                }
+                onChange={(event) => setGovernanceText(event.target.value)}
+              />
+              <div className={styles.commentActions}>
+                <button
+                  className="btn btn-primary"
+                  type="button"
+                  disabled={governanceBusy}
+                  onClick={submitGovernance}
+                >
+                  {governanceBusy ? '提交中…' : '提交'}
+                </button>
+                <button
+                  className="btn"
+                  type="button"
+                  onClick={() => setGovernanceOpen(null)}
+                >
+                  取消
+                </button>
+              </div>
+            </section>
+          )}
 
           <section className="panel">
             <h2 className={styles.sectionTitle}>评论 · {comments.length}</h2>

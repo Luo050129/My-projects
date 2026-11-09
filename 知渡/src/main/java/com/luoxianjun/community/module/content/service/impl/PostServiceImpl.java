@@ -11,6 +11,8 @@ import com.luoxianjun.community.common.util.RedisLock;
 import com.luoxianjun.community.common.util.TransactionSupport;
 import com.luoxianjun.community.config.StorageProperties;
 import com.luoxianjun.community.module.notify.publisher.NotificationPublisher;
+import com.luoxianjun.community.module.governance.GovernanceService;
+import com.luoxianjun.community.module.governance.entity.ContentReview;
 import com.luoxianjun.community.module.content.cache.PostCacheService;
 import com.luoxianjun.community.module.content.dto.PostInteractionVO;
 import com.luoxianjun.community.module.content.dto.PostVO;
@@ -49,6 +51,7 @@ public class PostServiceImpl implements PostService {
     private final RedisLock redisLock;
     private final StorageProperties storageProperties;
     private final NotificationPublisher notificationPublisher;
+    private final GovernanceService governanceService;
 
     /**
      * 封面图白名单：只接受本服务上传接口产出的路径。
@@ -110,6 +113,14 @@ public class PostServiceImpl implements PostService {
         return uid != null && (uid.equals(authorId) || SecurityUtil.isAdmin());
     }
 
+    /** 当前访问者能否读这篇帖子：私密、待审、驳回都只对作者与管理员开放 */
+    private boolean isReadableForViewer(Post post) {
+        if (!Post.isPublicReview(post.getReviewStatus())) {
+            return isOwnerOrAdmin(post.getUserId());
+        }
+        return !isPrivate(post) || isOwnerOrAdmin(post.getUserId());
+    }
+
     /** 缓存未命中时自旋等待缓存被回填的参数：最多等 2s（100 × 20ms） */
     private static final int CACHE_SPIN_TIMES = 100;
     private static final long CACHE_SPIN_SLEEP_MS = 20L;
@@ -131,7 +142,18 @@ public class PostServiceImpl implements PostService {
         post.setLikeCount(0);
         post.setCommentCount(0);
         post.setAiEnhanced(0);
+        // 显式 / 隐式 AI 标识：作者声明 + 结构化声明元数据
+        boolean declared = Boolean.TRUE.equals(request.aiGenerated());
+        post.setAiGenerated(declared ? 1 : 0);
+        post.setAiDeclaration(governanceService.buildAiDeclaration(post.getUserId(), declared));
+        // 发帖前置规则检查：命中不删内容，只转人工审核
+        String hit = governanceService.checkRules(request.title(), request.content());
+        post.setReviewStatus(hit == null ? Post.REVIEW_EXEMPT : Post.REVIEW_PENDING);
         postMapper.insert(post);
+        if (hit != null) {
+            governanceService.openReview(post.getId(), post.getUserId(),
+                    ContentReview.SOURCE_RULE, "命中规则词：" + hit);
+        }
         return post.getId();
     }
 
@@ -146,8 +168,22 @@ public class PostServiceImpl implements PostService {
         post.setCoverImage(cover);
         post.setPostType(normalizePostType(request.postType(), cover));
         post.setVisibility(normalizeVisibility(request.visibility()));
+        if (request.aiGenerated() != null) {
+            boolean declared = Boolean.TRUE.equals(request.aiGenerated());
+            post.setAiGenerated(declared ? 1 : 0);
+            post.setAiDeclaration(governanceService.buildAiDeclaration(post.getUserId(), declared));
+        }
+        // 编辑同样要过规则：不能靠「发帖时查一次」绕过治理
+        String hit = governanceService.checkRules(request.title(), request.content());
+        if (hit != null) {
+            post.setReviewStatus(Post.REVIEW_PENDING);
+        }
         postMapper.updateById(post);
         postCache.evict(id);
+        if (hit != null) {
+            governanceService.openReview(id, post.getUserId(),
+                    ContentReview.SOURCE_RULE, "编辑后命中规则词：" + hit);
+        }
     }
 
     @Override
@@ -171,10 +207,11 @@ public class PostServiceImpl implements PostService {
                         () -> loadFromDb(id),
                         CACHE_SPIN_TIMES, CACHE_SPIN_SLEEP_MS));
 
-        // 私密帖只对作者与管理员可见。这里再判一次而不是只靠「不写缓存」：
-        // 帖子从公开改成私密的瞬间，缓存可能还没失效完。
-        if (vo.visibility() != null && vo.visibility() == Post.VISIBILITY_PRIVATE
-                && !isOwnerOrAdmin(vo.authorId())) {
+        // 私密 / 待审 / 驳回内容只对作者与管理员可见。
+        // 这里再判一次而不是只靠「不写缓存」：状态切换的瞬间缓存可能还是旧值。
+        if (!isOwnerOrAdmin(vo.authorId())
+                && (Integer.valueOf(Post.VISIBILITY_PRIVATE).equals(vo.visibility())
+                    || !Post.isPublicReview(vo.reviewStatus()))) {
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
         return vo;
@@ -195,6 +232,11 @@ public class PostServiceImpl implements PostService {
             postCache.putNull(id);
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
+        // 「存在但对当前访问者不可读」不能写空标记：
+        // 否则作者稍后查看自己的待审帖会命中空标记，被误判为不存在。
+        if (!isReadableForViewer(post)) {
+            throw new BizException(ErrorCode.POST_NOT_FOUND);
+        }
         // 浏览量同样下推 DB 原子自增：自旋超时分支不持锁，读-改-写会丢更新
         postMapper.update(null, new LambdaUpdateWrapper<Post>()
                 .eq(Post::getId, id)
@@ -202,10 +244,10 @@ public class PostServiceImpl implements PostService {
         // 只同步内存中的展示值，DB 仍是权威；不再用 updateById 覆盖整行
         post.setViewCount((post.getViewCount() == null ? 0 : post.getViewCount()) + 1);
         PostVO vo = toVO(post, post.getContent());
-        if (isPrivate(post)) {
-            // 缓存是所有用户共享的，私密帖写进去等于泄露给下一个访问者。
-            // 代价是私密帖详情每次都回源，但这本来就只有作者一个人在看。
-            log.debug("私密帖 {} 跳过写缓存", id);
+        if (isPrivate(post) || !Post.isPublicReview(post.getReviewStatus())) {
+            // 缓存是所有用户共享的，私密 / 待审 / 驳回帖写进去等于泄露给下一个访问者。
+            // 代价是这类帖子详情每次都回源，但这本来就只有作者一个人在看。
+            log.debug("非公开帖 {} 跳过写缓存", id);
         } else {
             postCache.put(vo);
         }
@@ -218,7 +260,9 @@ public class PostServiceImpl implements PostService {
                 .eq(Post::getStatus, 1)
                 .eq(Post::getDeleted, 0)
                 // 公开列表只出公开帖：作者自己的私密帖在个人中心看，混进列表会让「私密」名不副实
-                .eq(Post::getVisibility, Post.VISIBILITY_PUBLIC);
+                .eq(Post::getVisibility, Post.VISIBILITY_PUBLIC)
+                // 待审 / 驳回内容不进公开列表，否则审核等于形同虚设
+                .in(Post::getReviewStatus, Post.PUBLIC_READABLE_REVIEW);
         if (keyword != null && !keyword.isBlank()) {
             wrapper.like(Post::getTitle, keyword);
         }
@@ -240,7 +284,8 @@ public class PostServiceImpl implements PostService {
                 .eq(Post::getDeleted, 0)
                 .eq(Post::getUserId, userId);
         if (!permitPrivate) {
-            wrapper.eq(Post::getVisibility, Post.VISIBILITY_PUBLIC);
+            wrapper.eq(Post::getVisibility, Post.VISIBILITY_PUBLIC)
+                    .in(Post::getReviewStatus, Post.PUBLIC_READABLE_REVIEW);
         }
         wrapper.orderByDesc(Post::getCreateTime);
         IPage<Post> page = postMapper.selectPage(new Page<>(current, size), wrapper);
@@ -274,7 +319,7 @@ public class PostServiceImpl implements PostService {
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
         // 私密帖对非作者等同于不存在
-        if (isPrivate(post) && !isOwnerOrAdmin(post.getUserId())) {
+        if (!isReadableForViewer(post)) {
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
 
@@ -319,7 +364,8 @@ public class PostServiceImpl implements PostService {
                 PostVO updated = new PostVO(vo.id(), vo.authorId(), vo.authorName(), vo.title(),
                         vo.summary(), vo.content(), vo.tags(), vo.coverImage(), vo.postType(),
                         vo.visibility(), vo.status(), vo.viewCount(),
-                        likeCount, vo.commentCount(), vo.aiEnhanced(), vo.createTime());
+                        likeCount, vo.commentCount(), vo.aiEnhanced(),
+                        vo.aiGenerated(), vo.reviewStatus(), vo.createTime());
                 postCache.put(updated);
             }
         });
@@ -343,7 +389,7 @@ public class PostServiceImpl implements PostService {
                 || !Integer.valueOf(1).equals(post.getStatus())) {
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
-        if (isPrivate(post) && !isOwnerOrAdmin(post.getUserId())) {
+        if (!isReadableForViewer(post)) {
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
 
@@ -439,6 +485,8 @@ public class PostServiceImpl implements PostService {
         return new PostVO(p.getId(), p.getUserId(), name, p.getTitle(), p.getSummary(),
                 content, p.getTags(), p.getCoverImage(), p.getPostType(), p.getVisibility(),
                 p.getStatus(), p.getViewCount(), p.getLikeCount(),
-                p.getCommentCount(), p.getAiEnhanced(), p.getCreateTime());
+                p.getCommentCount(), p.getAiEnhanced(),
+                Integer.valueOf(1).equals(p.getAiGenerated()), p.getReviewStatus(),
+                p.getCreateTime());
     }
 }

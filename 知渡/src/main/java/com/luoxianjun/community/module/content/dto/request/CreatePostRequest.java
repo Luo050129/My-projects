@@ -28,6 +28,14 @@ public record CreatePostRequest(
         String postType,
 
         /** 0 公开 / 1 私密，为空按 0 */
-        Integer visibility
+        Integer visibility,
+
+        /** 作者声明该内容由 AI 生成 / 辅助创作；缺省按 false，老客户端无需改动 */
+        Boolean aiGenerated
 ) {
+    /** 六参重载：保持既有调用方（含集成测试）兼容 */
+    public CreatePostRequest(String title, String content, String tags, String coverImage,
+                             String postType, Integer visibility) {
+        this(title, content, tags, coverImage, postType, visibility, Boolean.FALSE);
+    }
 }

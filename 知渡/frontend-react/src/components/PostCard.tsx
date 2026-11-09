@@ -30,6 +30,7 @@ export function PostCard({ post }: { post: Post }) {
           <span>{post.likeCount} 赞</span>
           <span className={styles.dot}>·</span>
           <span>{post.commentCount} 评论</span>
+          {post.aiGenerated && <span className={`tag ${styles.aiTag}`}>AI 辅助创作</span>}
           {post.aiEnhanced === 1 && <span className={`tag ${styles.aiTag}`}>AI 摘要</span>}
         </div>
       </div>

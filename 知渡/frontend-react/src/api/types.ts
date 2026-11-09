@@ -46,6 +46,10 @@ export interface Post {
   commentCount: number
   /** 1 = 已被 AI 增强过（有摘要） */
   aiEnhanced: number
+  /** 作者声明 AI 生成 / 辅助创作：前端必须显式展示该标识 */
+  aiGenerated: boolean
+  /** 0 免审 / 1 待审 / 2 通过 / 3 驳回 */
+  reviewStatus: number
   /** 后端 LocalDateTime，序列化为 "2026-10-21T10:00:00" */
   createTime: string
 }
@@ -159,6 +163,25 @@ export interface PostPayload {
   coverImage: string | null
   postType: PostType
   visibility: number
+  /** 作者声明 AI 生成 / 辅助创作；不传按 false */
+  aiGenerated?: boolean
+}
+
+export interface GovernanceInfo {
+  postId: number
+  aiGenerated: boolean
+  reviewStatus: number
+  aiDeclaration: string | null
+}
+
+export interface ReportItem {
+  id: number
+  postId: number
+  title: string
+  reason: string
+  status: number
+  handleNote: string | null
+  createTime: string
 }
 
 export interface PostQuery {

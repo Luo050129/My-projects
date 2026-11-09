@@ -109,21 +109,23 @@ public class CommentServiceImpl implements CommentService {
                 page.getTotal(), page.getCurrent(), page.getSize());
     }
 
-    /** 私密帖对非作者 / 非管理员等同于不存在，不泄露资源是否存在 */
+    /** 私密 / 待审 / 驳回帖对非作者、非管理员等同于不存在，不泄露资源是否存在 */
     private Post requireVisiblePost(Long postId) {
         Post post = postMapper.selectById(postId);
         if (post == null || Integer.valueOf(1).equals(post.getDeleted())
                 || !Integer.valueOf(1).equals(post.getStatus())) {
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
-        if (Integer.valueOf(Post.VISIBILITY_PRIVATE).equals(post.getVisibility()) && !canSeeTitle(post)) {
+        if (!canSeeTitle(post)) {
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
         return post;
     }
 
+    /** 公开可读 = 审核状态可公开 + 非私密；否则只有作者与管理员能拿到标题 */
     private boolean canSeeTitle(Post post) {
-        if (!Integer.valueOf(Post.VISIBILITY_PRIVATE).equals(post.getVisibility())) {
+        if (Post.isPublicReview(post.getReviewStatus())
+                && !Integer.valueOf(Post.VISIBILITY_PRIVATE).equals(post.getVisibility())) {
             return true;
         }
         Long uid = SecurityUtil.currentUserIdOrNull();

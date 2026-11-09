@@ -21,6 +21,13 @@ public enum ErrorCode {
 
     POST_NOT_FOUND(30001, "帖子不存在"),
     POST_NOT_OWNER(30002, "只能操作自己发布的帖子"),
+    REVIEW_NOT_FOUND(30003, "审核单不存在"),
+    REVIEW_STATE_INVALID(30004, "审核单当前状态不允许该操作"),
+    REPORT_NOT_FOUND(30005, "举报不存在"),
+    REPORT_STATE_INVALID(30006, "该举报已处理"),
+    APPEAL_NOT_ALLOWED(30007, "当前内容无可申诉的驳回记录"),
+    GOVERNANCE_ACTION_INVALID(30008, "处置动作不合法"),
+    REPORT_DUPLICATED(30009, "你已举报过该内容，请等待处理"),
 
     NOTIFY_NOT_FOUND(40001, "通知不存在"),
 
