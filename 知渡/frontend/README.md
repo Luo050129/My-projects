@@ -87,7 +87,7 @@ frontend/
 
 - **接口前缀** `/api`，开发时由 Vite 代理到 `http://127.0.0.1:8088`，前端代码里不出现硬编码地址。
 - **响应结构** `{ code, message, data }`，`code === 0` 视为成功；非 0 抛出 `message`。
-- **认证** JWT 放在 `Authorization: Bearer <token>`；收到 401 会清空登录态并提示重新登录。
+- **认证** JWT 放在 `Authorization: Bearer <token>`；收到 401 会清空登录态并**立即回跳登录页**（带 `redirect` 参数），不再等下一次导航。跳转由路由层注入回调实现，避免请求层反向依赖 router。
 - **正文字段** `PostVO.content` 只在详情接口返回，列表接口为 `null`（避免列表响应体过大）。
 - **图片上传** `POST /api/files/upload`，`multipart/form-data`，字段名 `file`；返回 `{ url, name, size, contentType }`。
   `url` 是形如 `/api/uploads/2026/10/xxx.png` 的相对路径，直接塞进 `img src` 即可（走同一个 `/api` 代理）。

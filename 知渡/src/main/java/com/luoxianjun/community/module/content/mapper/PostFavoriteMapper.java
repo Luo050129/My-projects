@@ -17,6 +17,7 @@ public interface PostFavoriteMapper extends BaseMapper<PostFavorite> {
             JOIN t_post_favorite f ON f.post_id = p.id
             WHERE f.user_id = #{userId}
               AND p.deleted = 0 AND p.status = 1
+              AND (p.visibility = 0 OR p.user_id = #{userId})
             ORDER BY f.create_time DESC
             """)
     IPage<Post> pageFavoritedByUser(IPage<Post> page, @Param("userId") Long userId);

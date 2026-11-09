@@ -12,11 +12,13 @@ import com.luoxianjun.community.module.content.service.PostService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /**
  * AI 内容增强：为帖子生成摘要 / 标签 / 合规判定。
  * 未配置 Key 或调用失败时降级为规则实现，保证链路永远可跑。
+ *
+ * <p>刻意不加 @Transactional：外部 HTTP 调用不能占着数据库事务。
+ * 写回由 PostService#applyAiEnhancement 自己的事务负责。</p>
  */
 @Slf4j
 @Service
@@ -35,7 +37,6 @@ public class ContentAiService {
     private final PostService postService;
     private final ObjectMapper objectMapper;
 
-    @Transactional
     public DeepSeekDto.AiResult enhancePost(Long postId) {
         Post post = postMapper.selectById(postId);
         // deleted 为逻辑删除标记；DB 默认 0，这里做空值防御，避免未持久化对象拆箱 NPE
@@ -48,7 +49,12 @@ public class ContentAiService {
         if (result == null) {
             result = ruleBased(post);
         }
-        postService.applyAiEnhancement(postId, result.summary(), result.tags());
+        if (result.safe()) {
+            postService.applyAiEnhancement(postId, result.summary(), result.tags());
+        } else {
+            // 合规判定不通过时仍把结果返回调用方，但不给违规内容做摘要/标签增强
+            log.warn("AI 合规判定不通过，跳过写回 postId={}", postId);
+        }
         return result;
     }
 

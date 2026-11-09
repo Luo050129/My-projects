@@ -8,7 +8,9 @@ import com.luoxianjun.community.common.exception.BizException;
 import com.luoxianjun.community.common.exception.ErrorCode;
 import com.luoxianjun.community.common.result.PageResult;
 import com.luoxianjun.community.common.util.RedisLock;
+import com.luoxianjun.community.common.util.TransactionSupport;
 import com.luoxianjun.community.config.StorageProperties;
+import com.luoxianjun.community.module.notify.publisher.NotificationPublisher;
 import com.luoxianjun.community.module.content.cache.PostCacheService;
 import com.luoxianjun.community.module.content.dto.PostInteractionVO;
 import com.luoxianjun.community.module.content.dto.PostVO;
@@ -27,6 +29,7 @@ import com.luoxianjun.community.security.SecurityUtil;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +48,7 @@ public class PostServiceImpl implements PostService {
     private final PostCacheService postCache;
     private final RedisLock redisLock;
     private final StorageProperties storageProperties;
+    private final NotificationPublisher notificationPublisher;
 
     /**
      * 封面图白名单：只接受本服务上传接口产出的路径。
@@ -191,8 +195,12 @@ public class PostServiceImpl implements PostService {
             postCache.putNull(id);
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
-        post.setViewCount(post.getViewCount() + 1);
-        postMapper.updateById(post);
+        // 浏览量同样下推 DB 原子自增：自旋超时分支不持锁，读-改-写会丢更新
+        postMapper.update(null, new LambdaUpdateWrapper<Post>()
+                .eq(Post::getId, id)
+                .setSql("view_count = CASE WHEN view_count + 1 < 0 THEN 0 ELSE view_count + 1 END"));
+        // 只同步内存中的展示值，DB 仍是权威；不再用 updateById 覆盖整行
+        post.setViewCount((post.getViewCount() == null ? 0 : post.getViewCount()) + 1);
         PostVO vo = toVO(post, post.getContent());
         if (isPrivate(post)) {
             // 缓存是所有用户共享的，私密帖写进去等于泄露给下一个访问者。
@@ -261,7 +269,8 @@ public class PostServiceImpl implements PostService {
     @Transactional
     public void toggleLike(Long id) {
         Post post = postMapper.selectById(id);
-        if (post == null || post.getDeleted() == 1 || post.getStatus() != 1) {
+        if (post == null || Integer.valueOf(1).equals(post.getDeleted())
+                || !Integer.valueOf(1).equals(post.getStatus())) {
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
         // 私密帖对非作者等同于不存在
@@ -283,11 +292,16 @@ public class PostServiceImpl implements PostService {
                             .eq(PostLike::getUserId, uid));
             delta = -1;
         } else {
-            // 点赞（唯一索引兜底幂等）
             PostLike like = new PostLike();
             like.setPostId(id);
             like.setUserId(uid);
-            postLikeMapper.insert(like);
+            try {
+                postLikeMapper.insert(like);
+            } catch (DuplicateKeyException e) {
+                // 同一用户并发点击：唯一索引兜住了脏数据，这里转成幂等成功，不再向调用方抛 500
+                log.debug("并发点赞命中唯一索引，按幂等处理 postId={} userId={}", id, uid);
+                return;
+            }
             delta = 1;
         }
         // 原子自增：避免「读-改-写」在并发下丢失更新（多个点赞互相覆盖计数）
@@ -295,23 +309,38 @@ public class PostServiceImpl implements PostService {
         postMapper.update(null, new LambdaUpdateWrapper<Post>()
                 .eq(Post::getId, id)
                 .setSql("like_count = CASE WHEN like_count " + op + " < 0 THEN 0 ELSE like_count " + op + " END"));
-        // 同步更新缓存中的点赞数（避免下次回源重复累加浏览量）
+        // 缓存计数以 DB 最新值为准重建，不用 vo.likeCount()+delta（并发下会读到旧值）
         postCache.get(id).ifPresent(vo -> {
             if (!postCache.isNullMarker(vo)) {
+                Post fresh = postMapper.selectById(id);
+                int likeCount = fresh != null && fresh.getLikeCount() != null
+                        ? fresh.getLikeCount()
+                        : (vo.likeCount() == null ? 0 : vo.likeCount());
                 PostVO updated = new PostVO(vo.id(), vo.authorId(), vo.authorName(), vo.title(),
                         vo.summary(), vo.content(), vo.tags(), vo.coverImage(), vo.postType(),
                         vo.visibility(), vo.status(), vo.viewCount(),
-                        vo.likeCount() + delta, vo.commentCount(), vo.aiEnhanced(), vo.createTime());
+                        likeCount, vo.commentCount(), vo.aiEnhanced(), vo.createTime());
                 postCache.put(updated);
             }
         });
+
+        // 点赞也异步通知帖主；提交后再投递，事务回滚时不会留下幽灵通知
+        if (delta > 0 && !post.getUserId().equals(uid)) {
+            User liker = userMapper.selectById(uid);
+            String name = liker != null ? liker.getNickname() : "有人";
+            String content = name + " 赞了你的帖子《" + post.getTitle() + "》";
+            Long receiverId = post.getUserId();
+            TransactionSupport.afterCommit(() ->
+                    notificationPublisher.publish(receiverId, "LIKE", content, id));
+        }
     }
 
     @Override
     @Transactional
     public boolean toggleFavorite(Long id) {
         Post post = postMapper.selectById(id);
-        if (post == null || post.getDeleted() == 1 || post.getStatus() != 1) {
+        if (post == null || Integer.valueOf(1).equals(post.getDeleted())
+                || !Integer.valueOf(1).equals(post.getStatus())) {
             throw new BizException(ErrorCode.POST_NOT_FOUND);
         }
         if (isPrivate(post) && !isOwnerOrAdmin(post.getUserId())) {
@@ -333,7 +362,12 @@ public class PostServiceImpl implements PostService {
         PostFavorite favorite = new PostFavorite();
         favorite.setPostId(id);
         favorite.setUserId(uid);
-        postFavoriteMapper.insert(favorite);
+        try {
+            postFavoriteMapper.insert(favorite);
+        } catch (DuplicateKeyException e) {
+            // 并发重复收藏：唯一索引兜底，按「已收藏」幂等返回
+            log.debug("并发收藏命中唯一索引，按幂等处理 postId={} userId={}", id, uid);
+        }
         return true;
     }
 

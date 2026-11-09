@@ -19,6 +19,7 @@ import static org.mockito.Mockito.*;
  */
 class ContentAiServiceTest {
 
+    // final 修饰的类不能被继承，修饰的方法不能被重写，修饰的变量不能被修改
     private final DeepSeekProperties props = mock(DeepSeekProperties.class);
     private final PostMapper postMapper = mock(PostMapper.class);
     private final PostService postService = mock(PostService.class);
@@ -32,7 +33,7 @@ class ContentAiServiceTest {
     private Post samplePost(String content) {
         Post post = new Post();
         post.setId(1L);
-        post.setTitle("测试标题");
+        post.setTitle("AI服务测试标题");
         post.setContent(content);
         post.setDeleted(0);
         return post;
@@ -55,7 +56,7 @@ class ContentAiServiceTest {
     @Test
     void bannedWordMarksUnsafe() {
         when(props.isConfigured()).thenReturn(false);
-        when(postMapper.selectById(2L)).thenReturn(samplePost("这是一篇违规广告内容，请勿购买。"));
+        when(postMapper.selectById(2L)).thenReturn(samplePost("这是一篇违规广告内容，请勿相信。"));
 
         DeepSeekDto.AiResult result = service().enhancePost(2L);
 

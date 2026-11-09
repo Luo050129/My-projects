@@ -2,6 +2,12 @@ import { auth, signOut } from './auth'
 
 const BASE = '/api'
 
+/** 401 回跳由路由层注入，避免 api 层直接依赖 router 造成循环引用 */
+let unauthorizedHandler = null
+export function setUnauthorizedHandler(fn) {
+  unauthorizedHandler = fn
+}
+
 /** 统一解析响应：HTTP 层与业务层的错误都在这里收敛成 Error */
 async function parseResponse(res) {
   let payload = null
@@ -12,8 +18,15 @@ async function parseResponse(res) {
   }
 
   if (res.status === 401) {
-    // token 过期或被篡改
+    // token 过期或被篡改：清登录态并立刻回跳，不再等下一次导航
     signOut()
+    if (unauthorizedHandler) {
+      try {
+        unauthorizedHandler(window.location.pathname + window.location.search)
+      } catch {
+        // 跳转失败不能吞掉原始的 401 错误
+      }
+    }
     throw new Error(payload?.message || '登录已过期，请重新登录')
   }
 
@@ -32,9 +45,9 @@ async function parseResponse(res) {
  * 统一请求封装：
  * - 自动带 JWT
  * - 后端约定 code=0 为成功，非 0 抛业务错误
- * - 401 清登录态
+ * - 401 清登录态并回跳登录页
  */
-export async function request(path, { method = 'GET', body, auth: needAuth = false } = {}) {
+export async function request(path, { method = 'GET', body } = {}) {
   const headers = { 'Content-Type': 'application/json' }
   if (auth.token) {
     headers.Authorization = `Bearer ${auth.token}`
@@ -84,12 +97,14 @@ export const enhancePost = (id) =>
   request(`/ai/posts/${id}/enhance`, { method: 'POST' })
 
 // ---------- 评论 ----------
+// 后端返回 {records,total,current,size} 分页对象，调用方需取 records
 export const fetchComments = (postId) => request(`/comments/posts/${postId}`)
 
 export const addComment = (postId, content, parentId = null) =>
   request('/comments', { method: 'POST', body: { postId, content, parentId } })
 
 // ---------- 通知 ----------
+// 同样返回分页对象
 export const fetchNotifications = () => request('/notifications')
 export const fetchUnreadCount = () => request('/notifications/unread-count')
 export const readNotification = (id) =>

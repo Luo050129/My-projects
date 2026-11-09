@@ -40,4 +40,18 @@ class JwtTokenProviderTest {
         assertFalse(provider.validate(tampered));
         assertFalse(provider.validate("not-a-jwt"));
     }
+
+    @Test
+    void blankSecretFailsFastWithActionableMessage() {
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> new JwtTokenProvider("", 30));
+        assertTrue(ex.getMessage().contains("JWT_SECRET"),
+                "prod 未注入密钥时应给出可执行的修复提示，而不是 JJWT 底层的 WeakKeyException");
+    }
+
+    @Test
+    void shortSecretIsRejected() {
+        assertThrows(IllegalStateException.class,
+                () -> new JwtTokenProvider("too-short", 30));
+    }
 }

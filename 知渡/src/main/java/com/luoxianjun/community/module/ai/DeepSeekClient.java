@@ -3,11 +3,12 @@ package com.luoxianjun.community.module.ai;
 import com.luoxianjun.community.module.ai.dto.DeepSeekDto;
 import com.luoxianjun.community.module.ai.properties.DeepSeekProperties;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.util.List;
 
 /**
@@ -23,8 +24,15 @@ public class DeepSeekClient {
 
     public DeepSeekClient(DeepSeekProperties props, RestClient.Builder builder) {
         this.props = props;
+        // timeout-seconds 必须真正生效：LLM 是概率性下游，连接/读取不能无限等待
+        int timeoutSeconds = props.getTimeoutSeconds() > 0 ? props.getTimeoutSeconds() : 20;
+        int timeoutMillis = Math.toIntExact(Duration.ofSeconds(timeoutSeconds).toMillis());
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(timeoutMillis);
+        requestFactory.setReadTimeout(timeoutMillis);
         this.client = builder
                 .baseUrl(props.getBaseUrl())
+                .requestFactory(requestFactory)
                 .defaultHeader("Authorization", "Bearer " + props.getApiKey())
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .build();

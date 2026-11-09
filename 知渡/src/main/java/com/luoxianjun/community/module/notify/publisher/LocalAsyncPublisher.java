@@ -3,20 +3,19 @@ package com.luoxianjun.community.module.notify.publisher;
 import com.luoxianjun.community.module.notify.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
-import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
  * 本地异步发布器：基于 JDK 21 虚拟线程异步落库。
- * 与 RabbitMQ 实现互换无需改动业务代码（依赖倒置）。
+ * 由 community.mq.type=local 激活（缺省即 local），与 RabbitMQ 实现互换无需改业务代码。
  */
 @Slf4j
 @Service
 @Primary
-@Profile({"local", "default", "!prod"})
+@ConditionalOnProperty(name = "community.mq.type", havingValue = "local", matchIfMissing = true)
 @RequiredArgsConstructor
 public class LocalAsyncPublisher implements NotificationPublisher {
 

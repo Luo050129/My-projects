@@ -15,6 +15,13 @@
 
 ---
 
+> **实现状态校正（2026-11-09）**：本轮做了一次完备性评估并补齐缺口。原先若干「设计上写了、代码里没有」的能力已落地：
+> 缓存 TTL 随机抖动、DeepSeek 连接/读取超时、`community.mq.type` 配置真正生效、评论与点赞通知在事务提交后投递、
+> 消费端按业务键判重、点赞/收藏并发幂等、评论与浏览量原子计数、AI 合规不通过时跳过写回、
+> `GET /posts/{id}/interaction` 匿名可读、客户端异常收敛为 4xx、限流 Lua 原子化且 Redis 故障 fail-open。
+> 同时修掉三类实际缺陷：评论越权、Vue 版评论区/通知页失效、prod 启动阻断。
+> 仍未实现的部分（MQ publisher confirm / 手动 ACK / 死信、AI 真实调用契约、Flyway、OpenAPI、CI）在第九节如实标注。
+
 ## 界面预览
 
 真实运行的界面截图（本地起 `local` profile + React 前端采集，非设计稿）。
@@ -77,7 +84,7 @@
 | AI 能力 | 自研 DeepSeek 客户端（OpenAI 兼容协议） | 无 Key 或调用失败时规则降级 |
 | 工程化 | Maven + JUnit5 + Mockito + Actuator | 自动化测试、可观测性、统一响应 |
 | 文件存储 | 本地磁盘 + 静态资源映射（可替换为对象存储） | 魔数校验、UUID 重命名、按年月分目录 |
-| 前端 | 双实现：Vue 3 + Vite 6（`frontend/`）、React 18 + TS + Vite 6（`frontend-react/`） | 同一套后端接口；两版功能对齐，可并行启动做技术栈对比 |
+| 前端 | 双实现：Vue 3 + Vite 6（`frontend/`）、React 18 + TS + Vite 6（`frontend-react/`） | 同一套后端接口；React 版功能最全，Vue 版停留在上一轮功能范围，可并行启动做技术栈对比 |
 
 ---
 
@@ -105,9 +112,9 @@ cd frontend-react && npm install && npm run dev    # React 18 版 → http://loc
 
 - 接口前缀：`http://127.0.0.1:8088/api`
 - H2 控制台：`http://127.0.0.1:8088/h2-console`（JDBC URL：`jdbc:h2:file:./data/community`）
-- 健康检查：`GET /api/actuator/health`
+- 健康检查：`GET /api/actuator/health`（`management` 为顶层配置，暴露 `health,info,metrics`；刻意不开放 `env` 以免泄露配置值）
 
-**种子账号**（首次启动自动初始化，缺失的会按需补齐）：
+**种子账号**（`local` / `test` 首次启动自动初始化，缺失的会按需补齐；`DataInitializer` 标注 `@Profile("!prod")`，生产环境不灌演示账号）：
 
 | 用户名 | 密码 | 角色 |
 | --- | --- | --- |
@@ -118,7 +125,7 @@ cd frontend-react && npm install && npm run dev    # React 18 版 → http://loc
 | david | david123 | USER |
 | eve | eve123 | USER |
 
-同时灌入 18 篇帖子（8 篇图文 + 10 篇纯文字，其中 2 篇私密）、15 条评论、39 个点赞、8 条收藏、9 组关注关系，
+同时灌入 18 篇帖子（6 篇图文 + 12 篇纯文字，其中 2 篇私密）、15 条评论、39 个点赞、8 条收藏、9 组关注关系，
 每段都按业务键判重，重复启动不会产生重复数据。种子封面是随 jar 打包的 SVG（`static/seed/`），
 所以 clone 下来不依赖任何外部图床就能看到完整页面。
 
@@ -203,7 +210,7 @@ curl -s http://127.0.0.1:8088/api/user/2/followees
 1. **计数冗余在 `t_post` 上**（`like_count` / `comment_count` / `view_count`），避免列表页对明细表做聚合查询；代价是计数需要与明细保持一致，这一点在「难点二」里踩过坑。
 2. **逻辑删除**用 `deleted` 字段，配合 MyBatis-Plus `@TableLogic` 自动过滤。
 3. **表名统一 `t_` 前缀**，规避 MySQL 里 `user` / `post` / `comment` 这类保留字带来的转义麻烦。
-4. **私密可见性放在服务端判断，不靠前端隐藏**：列表查询带 `visibility = 0` 条件，详情与点赞/收藏都再校验一次作者身份，
+4. **私密可见性放在服务端判断，不靠前端隐藏**：列表查询带 `visibility = 0` 条件，详情、点赞/收藏、评论与评论列表都再校验一次作者身份；「赞过 / 收藏过」列表的 SQL 也过滤 `visibility`，
    非作者拿到的错误是「帖子不存在」而不是「无权访问」——不泄露资源是否存在。私密帖**不写 Redis 缓存**，
    因为缓存是所有用户共享的，写进去等于泄露给下一个访问者。
 5. **关注/收藏与点赞同构**：都是「关系表 + 唯一索引」，靠数据库唯一约束实现幂等，而不是先查后插。
@@ -221,7 +228,7 @@ curl -s http://127.0.0.1:8088/api/user/2/followees
 
 **写帖子（写库删缓存）**
 
-事务内更新 DB → 成功后删除对应缓存 key，读请求自然回源重建。用「删」而不是「改」，避免并发写导致的旧值覆盖。
+事务内更新 DB → 成功后删除对应缓存 key，读请求自然回源重建。用「删」而不是「改」，避免并发写导致的旧值覆盖。评论新增同样删除缓存（`PostVO` 带 `comment_count`）。
 
 **点赞（唯一索引 + 原子计数）**
 
@@ -229,11 +236,11 @@ curl -s http://127.0.0.1:8088/api/user/2/followees
 
 **通知（发布者抽象 + 异步）**
 
-业务侧只调用 `NotificationPublisher.publish()`，不关心怎么投递。`local` profile 走虚拟线程异步，`prod` 切 RabbitMQ；消费端按 `receiver + type + refId` 业务唯一键保证幂等。
+业务侧只调用 `NotificationPublisher.publish()`，不关心怎么投递。`community.mq.type=local` 走虚拟线程异步、`rabbitmq` 切 MQ（由 `@ConditionalOnProperty` 装配，配置项真正生效）；通知在**事务提交后**才投递，避免回滚留下幽灵通知；消费端按 `receiver + type + refId` 判重（应用层实现，`t_notification` 暂无数据库唯一约束，后续迁移时补）。
 
 **AI 增强（降级治理）**
 
-调用 LLM → 成功则解析 JSON 写回帖子；超时、非 JSON、未配置 Key 三者任一发生，走规则实现（摘要截取、默认标签、关键词合规判定），主链路不受影响。
+调用 LLM → 成功则解析 JSON 写回帖子；超时、非 JSON、未配置 Key 三者任一发生，走规则实现（摘要截取、默认标签、关键词合规判定），主链路不受影响。超时由 `community.ai.timeout-seconds` 实际生效（`RestClient` 设置 connect/read timeout）；合规判定不通过时跳过写回，只把结果返回调用方。
 
 **图片上传（先验类型，再落盘）**
 
@@ -266,7 +273,7 @@ curl -s http://127.0.0.1:8088/api/user/2/followees
 
 ### 3. 计数一致性下推给数据库
 
-点赞数不用「读出来 +1 再写回」，而是交给一条 `UPDATE ... SET like_count = CASE ... END` 原子语句。并发控制由 DB 的行锁完成，应用层不需要额外加锁，也不会出现丢失更新。同理，`view_count` 只在回源时累加，保证 DB 是权威值。
+点赞数不用「读出来 +1 再写回」，而是交给一条 `UPDATE ... SET like_count = CASE ... END` 原子语句。并发控制由 DB 的行锁完成，应用层不需要额外加锁，也不会出现丢失更新。同理，`comment_count` 与 `view_count` 也交给原子 `UPDATE ... SET x = x + 1`，不再「读出来 +1 再写回」；浏览量只在回源时累加，保证 DB 是权威值。
 
 ### 4. 通知发布者抽象，本地开发零外部依赖
 
@@ -278,7 +285,7 @@ LLM 不是可靠依赖，它有超时、有非 JSON 输出、有额度耗尽。�
 
 - 客户端轻量自研（`RestClient` + OpenAI 兼容协议），不引入重框架；
 - 所有失败路径都有规则降级，**降级结果是可用的，不是报错**；
-- AI 结果异步写回，不影响发帖主链路。
+- AI 增强是独立手动接口（`POST /ai/posts/{id}/enhance`），发帖主链路不触发；结果同步写回，但外部 HTTP 调用已移出数据库事务，不会长时间占用连接。
 
 ### 6. 多 profile 隔离，保证任何环境都能启动
 
@@ -417,9 +424,9 @@ JdbcSQLSyntaxErrorException: Index "idx_post_user" already exists
 mvn test
 ```
 
-共 **25 个用例 / 6 个测试类**，分两类。
+共 **31 个用例 / 7 个测试类**，分两类（本轮新增 `CommentVisibilityIntegrationTest` 4 例、`JwtTokenProviderTest` 2 例）。
 
-### 纯单测（15 例，离线可跑）
+### 纯单测（17 例，离线可跑）
 
 | 测试类 | 覆盖点 |
 | --- | --- |
@@ -427,13 +434,14 @@ mvn test
 | `ContentAiServiceTest` | 无 Key 时规则降级、敏感词判定、长文摘要截断 |
 | `FileStorageServiceTest` | 魔数识别、伪装类型拒绝、路径穿越免疫、体积上限、1 字节文件不越界 |
 
-### 集成测试（10 例，需要真实 Redis；`test` profile 用 H2 内存库）
+### 集成测试（14 例，需要真实 Redis；`test` profile 用 H2 内存库）
 
 | 测试类 | 覆盖点 | 核心断言 |
 | --- | --- | --- |
 | `RedisLockIntegrationTest` | 互斥、防误删他人锁、自动过期防死锁、自旋等回源 | 20 线程并发只有 1 个真正回源，且无人抛异常 |
 | `PostCacheBreakdownIntegrationTest` | 命中不回源、并发防击穿、空值防穿透 | 20 并发未命中后 DB 浏览量仍为 1 |
 | `LikeIdempotencyIntegrationTest` | 点赞 toggle、并发计数一致、唯一索引兜底 | `like_count` 恒等于点赞表真实行数 |
+| `CommentVisibilityIntegrationTest` | 私密帖评论/列表越权、并发评论计数一致 | 非作者拿到「帖子不存在」；`comment_count` 恒等于评论表真实行数 |
 
 **为什么集成测试值得写**：缓存击穿和计数一致性这两类问题，用 mock 验证不了——mock 不会有并发竞争。只有连真实 Redis + 真实事务边界，才能复现出来。这两条测试也正是发现「难点一」「难点二」的直接原因。
 
@@ -445,9 +453,15 @@ mvn test
 
 如实列出，按优先级排序。
 
+> **本轮（2026-11-09）已修复且不再计入不足**：评论私密帖越权、「赞过/收藏过」列表泄露、评论与浏览量计数丢更新、
+> Vue 版评论区/通知页失效与 401 不回跳、`management` 缩进错误导致 actuator 只暴露 1 个端点、
+> prod 空 JWT 密钥无提示崩溃、prod 灌入弱口令种子账号、缓存雪崩无随机化、AI 超时是死配置、
+> `community.mq.type` 是死配置、点赞无通知、消费端无判重、AI 合规结果无处置、
+> 客户端异常误报 500、限流非原子且 Redis 故障拖垮登录、匿名读交互态被 401。
+
 | # | 不足 | 影响 | 改进方向 |
 | --- | --- | --- | --- |
-| 1 | **RabbitMQ 链路未在真实 MQ 上验证** | `prod` 的 publisher confirm、手动 ACK、死信队列只停留在设计层面，本机无 MQ，实际只验证了本地虚拟线程路径 | 起一个 RabbitMQ 实例，补消息不丢/不重复的集成测试 |
+| 1 | **RabbitMQ 链路未在真实 MQ 上验证** | `community.mq.type` 切换已生效，但 publisher confirm、手动 ACK、死信队列仍未实现；本机无 MQ，实际只验证了本地虚拟线程路径 | 起一个 RabbitMQ 实例，补可靠性配置与消息不丢/不重复的集成测试 |
 | 2 | **AI 真实模型调用未验证** | 只验证了「无 Key 降级」这条路径；真实调用的超时、非 JSON、限流分支没有实测 | 用真实 Key 跑通，并针对异常响应补契约测试 |
 | 3 | **图片存本地磁盘，无法水平扩展** | 多实例部署时，A 节点上传的图在 B 节点查不到，只能靠网关做会话粘滞兜底 | 抽 `FileStorageService` 接口，加对象存储（OSS / S3 / MinIO）实现 |
 | 4 | **图片无压缩与缩略图** | 原图直出，列表页 112×78 的缩略位也在拉整张图，手机拍的照片单张 3–5MB，流量浪费明显 | 上传时生成多尺寸或接入图片处理服务；列表改用 `?w=240` 变体 |
@@ -458,7 +472,7 @@ mvn test
 | 9 | **压测数据说服力有限** | 单机共机 + H2 内存库，缓存收益无法在本地量化 | 接网络 MySQL 后重测，区分冷/热缓存场景 |
 | 10 | **上传无病毒扫描与 EXIF 剥离** | 魔数只能确认「这是个图片」，无法排除图片解析器漏洞利用；EXIF 里可能带拍摄地点与设备信息 | 接入 ClamAV；上传时重编码以剥离元数据 |
 | 11 | **JWT 无刷新与吊销机制** | 签发后只能等过期，无法主动失效 | 引入 refresh token + Redis 存 jti 黑名单 |
-| 12 | **同一用户并发点赞会撞唯一索引** | 有唯一索引兜底不会产生脏数据，但竞争失败的一次事务会回滚并向调用方返回错误 | 捕获重复键异常转为幂等成功；或对 `(post_id, user_id)` 加细粒度锁 |
+| 12 | ~~同一用户并发点赞会撞唯一索引~~ **本轮已修复** | 点赞/收藏均捕获 `DuplicateKeyException` 转为幂等成功，并加回归测试 | — |
 | 13 | **无 CI/CD** | 没有流水线，测试与构建靠本地手动执行 | 接入 GitHub Actions：编译 + 单测 + 集成测试 |
 
 ---
@@ -477,7 +491,7 @@ java -jar zhidu-community.jar --spring.profiles.active=prod
 - 表结构用 `src/main/resources/db/schema-mysql.sql`（MySQL 8 语法，与 H2 版字段一一对应；
   索引与唯一键内联声明，表已存在时整句跳过，脚本可重复执行）。
 - `community.mq.type=rabbitmq` 启用 MQ 发布消费；`community.ai.api-key` 注入 DeepSeek Key 启用真实模型。
-- JWT 密钥务必通过环境变量注入，不要提交到仓库。
+- JWT 密钥务必通过环境变量注入，不要提交到仓库；未注入或短于 32 字节时启动期 fail-fast 并给出提示（配置项见 `.env.example`）。
 
 ---
 

@@ -65,7 +65,9 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    items.value = (await fetchNotifications()) || []
+    // 后端返回分页对象 {records,total,...}，必须取 records
+    const page = await fetchNotifications()
+    items.value = page?.records ?? []
     unreadCount.value = Number(await fetchUnreadCount()) || 0
   } catch (e) {
     error.value = e.message || '加载失败'

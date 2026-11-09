@@ -12,9 +12,12 @@ import com.luoxianjun.community.module.notify.mapper.NotificationMapper;
 import com.luoxianjun.community.module.notify.service.NotificationService;
 import com.luoxianjun.community.security.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class NotificationServiceImpl implements NotificationService {
@@ -24,13 +27,33 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public void save(Long receiverId, String type, String content, Long refId) {
+        // 消费端按业务唯一键幂等：MQ 重投 / 本地异步重试都不产生重复通知。
+        // 未加数据库唯一约束——老库可能已有重复数据，直接 ALTER 会让启动失败，
+        // 所以这里用「判重 + 捕获重复键」两层保护，后续迁移再加 uk_notify_biz。
+        LambdaQueryWrapper<Notification> query = new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getReceiverId, receiverId)
+                .eq(Notification::getType, type);
+        if (refId == null) {
+            query.isNull(Notification::getRefId);
+        } else {
+            query.eq(Notification::getRefId, refId);
+        }
+        Long exists = notificationMapper.selectCount(query);
+        if (exists != null && exists > 0) {
+            return;
+        }
+
         Notification n = new Notification();
         n.setReceiverId(receiverId);
         n.setType(type);
         n.setContent(content);
         n.setRefId(refId);
         n.setReadStatus(0);
-        notificationMapper.insert(n);
+        try {
+            notificationMapper.insert(n);
+        } catch (DuplicateKeyException e) {
+            log.debug("通知重复投递，已忽略 receiverId={} type={} refId={}", receiverId, type, refId);
+        }
     }
 
     @Override

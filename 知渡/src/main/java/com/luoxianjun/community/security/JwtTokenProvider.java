@@ -22,7 +22,18 @@ public class JwtTokenProvider {
 
     public JwtTokenProvider(@Value("${community.jwt.secret}") String secret,
                             @Value("${community.jwt.expiration-minutes:120}") long expirationMinutes) {
-        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+        // 启动期 fail-fast：prod 默认空密钥原本会在 JJWT 内部抛 WeakKeyException，
+        // 报错看不出原因。这里给出可直接执行的修复提示，而不是放任弱密钥上线。
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT 密钥未配置：请通过环境变量 JWT_SECRET 注入至少 32 字节的随机串");
+        }
+        byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
+        if (secretBytes.length < 32) {
+            throw new IllegalStateException(
+                    "JWT 密钥长度不足：HS256 要求至少 32 字节，当前 " + secretBytes.length + " 字节，请检查 JWT_SECRET");
+        }
+        this.key = Keys.hmacShaKeyFor(secretBytes);
         this.expirationMillis = expirationMinutes * 60 * 1000L;
     }
 

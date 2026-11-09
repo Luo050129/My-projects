@@ -5,15 +5,16 @@ import com.luoxianjun.community.module.notify.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * prod 环境下的通知消费者：从 MQ 取消息并落库（含失败重试由 MQ 重试机制保证）。
+ * community.mq.type=rabbitmq 时的通知消费者：从 MQ 取消息并落库。
+ * 落库侧按业务键判重，重复投递不会产生重复通知。
  */
 @Slf4j
 @Component
-@Profile("prod")
+@ConditionalOnProperty(name = "community.mq.type", havingValue = "rabbitmq")
 @RequiredArgsConstructor
 public class RabbitMqConsumer {
 

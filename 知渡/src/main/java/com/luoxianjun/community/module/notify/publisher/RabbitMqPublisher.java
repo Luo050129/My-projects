@@ -4,16 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 /**
  * 生产环境发布器：将通知发往 RabbitMQ（解耦 + 削峰），由消费者落库。
- * 仅 prod profile 生效；本地用 {@link LocalAsyncPublisher} 代替。
+ * 由 community.mq.type=rabbitmq 激活（配置项真正生效，不再靠 @Profile 硬编码）。
  */
 @Slf4j
 @Service
-@Profile("prod")
+@ConditionalOnProperty(name = "community.mq.type", havingValue = "rabbitmq")
 @RequiredArgsConstructor
 public class RabbitMqPublisher implements NotificationPublisher {
 

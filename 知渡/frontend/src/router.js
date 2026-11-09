@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { isLoggedIn } from './auth'
+import { setUnauthorizedHandler } from './api'
 
 const routes = [
   { path: '/', redirect: '/posts' },
@@ -40,6 +41,11 @@ router.beforeEach((to) => {
   if (to.name === 'login' && isLoggedIn()) {
     return { name: 'posts' }
   }
+})
+
+// 请求层遇到 401 时主动回跳登录页，带上原地址供登录后返回
+setUnauthorizedHandler((redirect) => {
+  router.replace({ name: 'login', query: { redirect } }).catch(() => {})
 })
 
 export default router

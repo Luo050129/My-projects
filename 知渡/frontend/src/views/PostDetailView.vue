@@ -112,7 +112,9 @@ async function load() {
   error.value = ''
   try {
     post.value = await fetchPost(route.params.id)
-    comments.value = (await fetchComments(route.params.id)) || []
+    // 后端返回分页对象 {records,total,...}，不能当数组用
+    const page = await fetchComments(route.params.id)
+    comments.value = page?.records ?? []
   } catch (e) {
     error.value = e.message || '加载失败'
   } finally {

@@ -15,16 +15,6 @@ spring:
     time-zone: GMT+8
     default-property-inclusion: non_null
 
-  # 可观测性：暴露关键端点
-  management:
-    endpoints:
-      web:
-        exposure:
-          include: health,info,metrics,env
-    endpoint:
-      health:
-        show-details: never
-
   # 全局校验失败直接抛 MethodArgumentNotValidException（由全局异常处理器收敛）
   mvc:
     throw-exception-if-no-handler-found: true
@@ -35,10 +25,22 @@ spring:
       max-file-size: 5MB
       max-request-size: 6MB
 
+# 可观测性：必须是顶层 management。
+# 曾误写在 spring: 之下变成 spring.management.*，Boot 静默忽略，
+# 实际只暴露了默认的 health 一个端点（启动日志 "Exposing 1 endpoint"）。
+# 不暴露 env：该端点可能泄露配置值，非必要不开放。
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: never
+
 community:
   jwt:
-    # 演示用密钥，生产务必替换为 256bit 以上随机串并通过环境变量注入
-    # 改为环境变量可覆盖（默认仍是 demo 值，本地运行不受影响）
+    # 演示用密钥，仅限 local/test；prod 必须通过环境变量注入（见 .env.example）
     secret: ${JWT_SECRET:lxb-community-demo-secret-key-please-change-me-2026}
     expiration-minutes: 120
   storage:

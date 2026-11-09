@@ -10,11 +10,13 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * 帖子详情缓存（Cache-Aside 模式）。
  * - 命中直接返回；未命中由调用方加分布式锁回源（防击穿）
  * - 不存在的帖子缓存空标记短时间（防穿透）
+ * - 过期时间叠加随机抖动，避免大量 key 同时失效（防雪崩）
  */
 @Slf4j
 @Service
@@ -26,7 +28,8 @@ public class PostCacheService {
 
     private static final String KEY_PREFIX = "post:detail:";
     private static final String NULL_MARKER = "__NULL__";
-    private static final Duration TTL = Duration.ofMinutes(10);
+    private static final long TTL_BASE_SECONDS = 600;
+    private static final long TTL_JITTER_SECONDS = 120;
     private static final Duration NULL_TTL = Duration.ofMinutes(1);
 
     public Optional<PostVO> get(Long id) {
@@ -57,10 +60,17 @@ public class PostCacheService {
 
     public void put(PostVO vo) {
         try {
-            redisTemplate.opsForValue().set(KEY_PREFIX + vo.id(), objectMapper.writeValueAsString(vo), TTL);
+            redisTemplate.opsForValue().set(KEY_PREFIX + vo.id(),
+                    objectMapper.writeValueAsString(vo), ttlWithJitter());
         } catch (JsonProcessingException e) {
             log.warn("序列化帖子缓存失败 id={}", vo.id(), e);
         }
+    }
+
+    /** 基础 10 分钟 + 0~120s 抖动：热点 key 不会在同一秒集体过期 */
+    private Duration ttlWithJitter() {
+        return Duration.ofSeconds(TTL_BASE_SECONDS
+                + ThreadLocalRandom.current().nextLong(TTL_JITTER_SECONDS));
     }
 
     public void putNull(Long id) {
