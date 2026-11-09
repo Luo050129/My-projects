@@ -15,6 +15,7 @@ import com.luoxianjun.community.module.governance.GovernanceService;
 import com.luoxianjun.community.module.governance.entity.ContentReview;
 import com.luoxianjun.community.module.content.cache.PostCacheService;
 import com.luoxianjun.community.module.content.dto.PostInteractionVO;
+import com.luoxianjun.community.module.content.dto.PostSuggestVO;
 import com.luoxianjun.community.module.content.dto.PostVO;
 import com.luoxianjun.community.module.content.dto.request.CreatePostRequest;
 import com.luoxianjun.community.module.content.dto.request.UpdatePostRequest;
@@ -25,6 +26,7 @@ import com.luoxianjun.community.module.content.mapper.PostFavoriteMapper;
 import com.luoxianjun.community.module.content.mapper.PostLikeMapper;
 import com.luoxianjun.community.module.content.mapper.PostMapper;
 import com.luoxianjun.community.module.content.service.PostService;
+import com.luoxianjun.community.module.content.search.PostKeyword;
 import com.luoxianjun.community.module.user.entity.User;
 import com.luoxianjun.community.module.user.mapper.UserMapper;
 import com.luoxianjun.community.security.SecurityUtil;
@@ -35,6 +37,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -254,23 +258,113 @@ public class PostServiceImpl implements PostService {
         return vo;
     }
 
-    @Override
-    public PageResult<PostVO> pagePosts(String keyword, long current, long size) {
-        LambdaQueryWrapper<Post> wrapper = new LambdaQueryWrapper<Post>()
+    /** 公开可读帖子的统一过滤条件：列表与联想必须共用，避免联想泄露私密 / 待审内容 */
+    private LambdaQueryWrapper<Post> publicWrapper() {
+        return new LambdaQueryWrapper<Post>()
                 .eq(Post::getStatus, 1)
                 .eq(Post::getDeleted, 0)
                 // 公开列表只出公开帖：作者自己的私密帖在个人中心看，混进列表会让「私密」名不副实
                 .eq(Post::getVisibility, Post.VISIBILITY_PUBLIC)
                 // 待审 / 驳回内容不进公开列表，否则审核等于形同虚设
                 .in(Post::getReviewStatus, Post.PUBLIC_READABLE_REVIEW);
-        if (keyword != null && !keyword.isBlank()) {
-            wrapper.like(Post::getTitle, keyword);
+    }
+
+    /**
+     * 多词包含匹配：每个词在标题 / 摘要 / 正文 / 标签里命中即可，词与词之间也是 OR。
+     * 全部条件下推到 SQL，参数由 MyBatis-Plus 绑定，不在应用层捞出后再过滤。
+     */
+    private void applyKeyword(LambdaQueryWrapper<Post> wrapper, List<String> words) {
+        if (words.isEmpty()) {
+            return;
         }
-        wrapper.orderByDesc(Post::getCreateTime);
+        wrapper.and(outer -> {
+            for (int i = 0; i < words.size(); i++) {
+                String pattern = "%" + words.get(i) + "%";
+                // 首个词用 and、后续词用 or(Consumer)：
+                // 若统一用 and(Consumer)，MyBatis-Plus 会强制以 AND 连接，
+                // 多词查询会退化成「必须同时包含所有词」，与「任一词命中」的语义相反。
+                if (i == 0) {
+                    outer.and(inner -> applyWordCondition(inner, pattern));
+                } else {
+                    outer.or(inner -> applyWordCondition(inner, pattern));
+                }
+            }
+        });
+    }
+
+    /** 一个词在四个字段上的包含匹配，显式 LOWER 抹平 H2 / MySQL 的大小写差异 */
+    private void applyWordCondition(LambdaQueryWrapper<Post> inner, String pattern) {
+        // 列名是常量，用户输入只经 {0} 参数绑定，不存在拼接注入
+        inner.apply("LOWER(title) LIKE LOWER({0})", pattern)
+                .or().apply("LOWER(summary) LIKE LOWER({0})", pattern)
+                .or().apply("LOWER(content) LIKE LOWER({0})", pattern)
+                .or().apply("LOWER(tags) LIKE LOWER({0})", pattern);
+    }
+
+    @Override
+    public PageResult<PostVO> pagePosts(String keyword, long current, long size) {
+        List<String> words = PostKeyword.split(keyword);
+        LambdaQueryWrapper<Post> wrapper = publicWrapper();
+        applyKeyword(wrapper, words);
+        if (words.isEmpty()) {
+            wrapper.orderByDesc(Post::getCreateTime);
+        } else {
+            // 搜索结果按点赞数排序；id 作次级键，保证同赞数时翻页稳定
+            wrapper.orderByDesc(Post::getLikeCount).orderByDesc(Post::getId);
+        }
         IPage<Post> page = postMapper.selectPage(new Page<>(current, size), wrapper);
         return PageResult.of(
                 page.getRecords().stream().map(this::toVO).toList(),
                 page.getTotal(), page.getCurrent(), page.getSize());
+    }
+
+    @Override
+    public List<PostSuggestVO> suggest(String keyword, int limit) {
+        List<String> words = PostKeyword.split(keyword);
+        if (words.isEmpty()) {
+            return List.of();
+        }
+        int n = Math.min(Math.max(limit, 1), 20);
+        LambdaQueryWrapper<Post> wrapper = publicWrapper();
+        applyKeyword(wrapper, words);
+        wrapper.orderByDesc(Post::getLikeCount).orderByDesc(Post::getId);
+        IPage<Post> page = postMapper.selectPage(new Page<>(1, n), wrapper);
+        return page.getRecords().stream().map(p -> toSuggest(p, words)).toList();
+    }
+
+    private PostSuggestVO toSuggest(Post p, List<String> words) {
+        User author = userMapper.selectById(p.getUserId());
+        String name = author != null ? author.getNickname() : "未知用户";
+        String matched = words.stream()
+                .filter(w -> containsIgnoreCase(p.getTitle(), w)
+                        || containsIgnoreCase(p.getSummary(), w)
+                        || containsIgnoreCase(p.getContent(), w)
+                        || containsIgnoreCase(p.getTags(), w))
+                .findFirst().orElse(words.get(0));
+        return new PostSuggestVO(p.getId(), p.getTitle(), snippet(p, matched), name,
+                p.getLikeCount(), p.getCommentCount(), matched);
+    }
+
+    private boolean containsIgnoreCase(String text, String word) {
+        return text != null && word != null
+                && text.toLowerCase(Locale.ROOT).contains(word.toLowerCase(Locale.ROOT));
+    }
+
+    /** 从摘要 / 正文 / 标签截一段命中词附近的上下文；标题已在 title 中展示，不再重复 */
+    private String snippet(Post p, String word) {
+        String[] fields = {p.getSummary(), p.getContent(), p.getTags()};
+        for (String field : fields) {
+            if (!containsIgnoreCase(field, word)) {
+                continue;
+            }
+            String text = field.replaceAll("\\s+", " ");
+            int idx = text.toLowerCase(Locale.ROOT).indexOf(word.toLowerCase(Locale.ROOT));
+            int start = Math.max(0, idx - 18);
+            int end = Math.min(text.length(), idx + word.length() + 32);
+            return (start > 0 ? "…" : "") + text.substring(start, end)
+                    + (end < text.length() ? "…" : "");
+        }
+        return "";
     }
 
     @Override

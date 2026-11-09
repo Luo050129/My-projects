@@ -14,6 +14,7 @@ import type {
   Post,
   PostInteraction,
   PostPayload,
+  PostSuggestion,
   GovernanceInfo,
   ReportItem,
   UploadResult,
@@ -91,6 +92,13 @@ export const fetchMyLikes = (current = 1, size = 10, signal?: AbortSignal) =>
 
 export const fetchMyFavorites = (current = 1, size = 10, signal?: AbortSignal) =>
   request<PageResult<Post>>(`/me/favorites?current=${current}&size=${size}`, { signal })
+
+// ---------- 搜索 ----------
+/** 输入联想：多词包含匹配，后端按点赞数降序返回；慢输入时可用 signal 取消上一轮 */
+export const fetchSuggestions = (keyword: string, limit = 8, signal?: AbortSignal) => {
+  const q = new URLSearchParams({ keyword, limit: String(limit) })
+  return request<PostSuggestion[]>(`/search/suggest?${q.toString()}`, { signal })
+}
 
 // ---------- 帖子 ----------
 export const fetchPosts = (

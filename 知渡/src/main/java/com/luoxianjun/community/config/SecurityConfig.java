@@ -62,7 +62,7 @@ public class SecurityConfig {
                 .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                 // 内容读接口公开
                 // /posts/* 只匹配单段，三段路径必须显式列出，否则匿名读交互态会被 401
-                .requestMatchers(HttpMethod.GET, "/posts", "/posts/*", "/posts/*/interaction", "/comments/posts/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/posts", "/posts/*", "/posts/*/interaction", "/comments/posts/**", "/search/**").permitAll()
                 // 用户公开主页与社交关系可匿名读（/user/page 另有 @PreAuthorize 兜住）
                 .requestMatchers(HttpMethod.GET, "/user/*", "/user/*/followers", "/user/*/followees")
                     .permitAll()

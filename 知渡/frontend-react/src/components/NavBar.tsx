@@ -24,8 +24,9 @@ export function NavBar() {
   return (
     <header className={styles.nav}>
       <div className={styles.inner}>
-        <NavLink to="/posts" className={styles.brand}>
-          知渡
+        <NavLink to="/posts" className={styles.brand} aria-label="知渡 · 返回帖子首页">
+          <img src="/icon.svg" alt="" className={styles.brandIcon} width="30" height="30" />
+          <span>知渡</span>
         </NavLink>
 
         <nav className={styles.links}>
@@ -63,7 +64,7 @@ export function NavBar() {
                 <span className={styles.miniAvatar} aria-hidden="true">
                   {(user?.nickname || '我').slice(0, 1)}
                 </span>
-                {user?.nickname || '用户'}
+                <span className={styles.whoName}>{user?.nickname || '用户'}</span>
               </NavLink>
               <button type="button" className="btn btn-sm" onClick={handleLogout}>
                 退出

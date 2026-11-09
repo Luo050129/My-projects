@@ -54,8 +54,8 @@
   padding: 10px 14px;
   font-size: 13px;
   color: var(--warn);
-  background: rgba(224, 163, 62, 0.08);
-  border: 1px solid #5a4a2a;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn-line);
   border-radius: 8px;
 }
 

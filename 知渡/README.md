@@ -31,7 +31,11 @@
 > 隐式声明元数据、发帖/编辑规则拦截、审核状态机、举报、申诉、审计留痕；待审 / 驳回内容对非作者一律不可见，
 > 贯穿列表、详情、评论、点赞、收藏、赞过与收藏过列表；
 > ④ CORS 由 `*` 收紧为白名单（`CORS_ALLOWED_ORIGINS`），React 前端接入标识展示与举报 / 申诉。
-> 仍待办：全文 / 语义检索、标签话题、关注 Feed、站内 RAG 问答。
+> 仍待办：语义 / 向量检索与召回评测、标签话题、关注 Feed、站内 RAG 问答。
+>
+> **搜索升级（2026-11-09 第五轮）**：补齐「输入几个词 → 弹出包含这些词的帖子 → 按点赞数排序」。
+> 搜索从「只 LIKE 标题、按时间排序」升级为多词、四字段、大小写不敏感的包含匹配；
+> 新增 `/search/suggest` 联想接口与两版前端下拉；新增 11 个回归用例（共 48 例）。
 
 ## 界面预览
 
@@ -265,6 +269,16 @@ curl -s http://127.0.0.1:8088/api/user/2/followees
 
 发帖时 `coverImage` 只接受上述前缀的路径（正则白名单），传外链直接拒绝。
 
+**搜索 / 联想（多词包含匹配 + 点赞排序）**
+
+`GET /posts?keyword=...` 与 `GET /search/suggest` 共用 `publicWrapper()`（已发布 + 未删除 + 公开 + 审核可读），
+联想不会泄露私密 / 待审帖。输入按空格、逗号、顿号等切词（最多 5 个、每词 40 字），清洗掉 `%` `_` 等
+LIKE 通配符；每个词在 `title / summary / content / tags` 上做 `LOWER(...) LIKE LOWER(?)`，任一词命中即返回（OR）。
+显式 `LOWER` 是为了抹平 H2 与 MySQL 默认大小写行为的差异。带关键词时按 `like_count DESC, id DESC` 排序
+（次级键保证翻页稳定），无关键词仍按 `create_time DESC` 走时间流；过滤条件下推到 SQL，用户输入只经参数绑定。
+`/search/suggest` 取点赞最高的前 N 条（默认 8、上限 20），附带命中词与上下文片段；
+React / Vue 两版在输入停顿后弹出联想下拉，点击直达详情。
+
 ---
 
 ## 五、核心设计决策
@@ -440,17 +454,18 @@ JdbcSQLSyntaxErrorException: Index "idx_post_user" already exists
 mvn test
 ```
 
-共 **37 个用例 / 8 个测试类**，分两类（第三轮新增 `GovernanceIntegrationTest` 6 例）。
+共 **48 个用例 / 10 个测试类**，分两类（第五轮新增 `PostKeywordTest` 5 例、`PostSearchIntegrationTest` 6 例）。
 
-### 纯单测（17 例，离线可跑）
+### 纯单测（22 例，离线可跑）
 
 | 测试类 | 覆盖点 |
 | --- | --- |
 | `JwtTokenProviderTest` | 签发 / 解析 / 过期 / 篡改失效 |
 | `ContentAiServiceTest` | 无 Key 时规则降级、敏感词判定、长文摘要截断 |
 | `FileStorageServiceTest` | 魔数识别、伪装类型拒绝、路径穿越免疫、体积上限、1 字节文件不越界 |
+| `PostKeywordTest` | 多分隔符切词、去重与词数上限、LIKE 通配符清洗、空输入与超长截断 |
 
-### 集成测试（20 例，需要真实 Redis；`test` profile 用 H2 内存库）
+### 集成测试（26 例，需要真实 Redis；`test` profile 用 H2 内存库）
 
 | 测试类 | 覆盖点 | 核心断言 |
 | --- | --- | --- |
@@ -459,6 +474,7 @@ mvn test
 | `LikeIdempotencyIntegrationTest` | 点赞 toggle、并发计数一致、唯一索引兜底 | `like_count` 恒等于点赞表真实行数 |
 | `CommentVisibilityIntegrationTest` | 私密帖评论/列表越权、并发评论计数一致 | 非作者拿到「帖子不存在」；`comment_count` 恒等于评论表真实行数 |
 | `GovernanceIntegrationTest` | 规则拦截与可见性、审核通过/驳回、申诉状态机、举报去重、私密集报被拒、ADMIN 接口鉴权 | 待审帖对非作者恒为「帖子不存在」；非法状态流转被拒；USER 访问 `/admin/reviews` 返回 403 |
+| `PostSearchIntegrationTest` | 多词 OR 命中、正文/标签命中、大小写不敏感、点赞数排序、联想 Top-N、私密与待审隔离 | 搜索结果 `like_count` 严格降序；私密 / 待审帖不进列表与联想 |
 
 **为什么集成测试值得写**：缓存击穿和计数一致性这两类问题，用 mock 验证不了——mock 不会有并发竞争。只有连真实 Redis + 真实事务边界，才能复现出来。这两条测试也正是发现「难点一」「难点二」的直接原因。
 
@@ -488,7 +504,7 @@ mvn test
 | 5 | **删帖不回收图片文件** | 帖子删了，`data/uploads` 里的图还在，长期会积累孤儿文件 | 删帖时按 `coverImage` 反查删除；或定期跑对账任务清理无引用文件 |
 | 6 | ~~缺少接口文档~~ **已补齐** | springdoc-openapi 已接入，dev/test 可访问 `/swagger-ui.html`，prod 关闭 | — |
 | 7 | ~~缺少数据库迁移工具~~ **已补齐** | Flyway 接管 V1/V2 迁移，老库 baseline 平滑接入，H2 与 MySQL 共用一份双方言脚本 | — |
-| 8 | **功能面仍偏窄** | 内容审核流与 AI 标识已补齐；仍缺全文 / 语义检索、关注 feed、标签体系、富文本、站内 RAG 问答 | 按「检索分发 → AI 差异化」路线逐步补齐 |
+| 8 | **功能面仍偏窄** | 内容审核流、AI 标识与多词包含匹配搜索已补齐；仍缺语义 / 向量检索与召回评测、关注 feed、标签体系、富文本、站内 RAG 问答 | 按「检索分发 → AI 差异化」路线逐步补齐 |
 | 9 | **压测数据说服力有限** | 单机共机 + H2 内存库，缓存收益无法在本地量化 | 接网络 MySQL 后重测，区分冷/热缓存场景 |
 | 10 | **上传无病毒扫描与 EXIF 剥离** | 魔数只能确认「这是个图片」，无法排除图片解析器漏洞利用；EXIF 里可能带拍摄地点与设备信息 | 接入 ClamAV；上传时重编码以剥离元数据 |
 | 11 | **JWT 无刷新与吊销机制** | 签发后只能等过期，无法主动失效 | 引入 refresh token + Redis 存 jti 黑名单 |

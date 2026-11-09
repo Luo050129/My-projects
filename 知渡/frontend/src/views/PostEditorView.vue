@@ -196,7 +196,7 @@ async function submit() {
 .cover-drop:hover,
 .cover-drop.dragging {
   border-color: var(--accent);
-  background: rgba(90, 140, 255, 0.06);
+  background: var(--accent-soft);
 }
 .cover-drop.filled {
   padding: 0;

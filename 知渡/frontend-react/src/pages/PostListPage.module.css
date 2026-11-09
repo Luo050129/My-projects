@@ -2,17 +2,210 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .search {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
+  min-width: 0;
 }
 
-.search input {
+/* 联想面板相对输入框定位，不能相对整个 form（否则宽度会被搜索按钮挤歪） */
+.inputWrap {
+  position: relative;
   flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.inputWrap input {
+  flex: 1;
+  height: 42px;
+  padding-left: 39px;
+  padding-right: 34px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--faint);
+  pointer-events: none;
+  z-index: 1;
+  transition: color var(--dur) var(--ease);
+}
+
+.inputWrap:focus-within .searchIcon {
+  color: var(--accent);
+}
+
+.clearBtn {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--panel-3);
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+  transition: color var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+.clearBtn:hover {
+  color: var(--text);
+  background: var(--line-strong);
+}
+
+/* ---------- 联想下拉 ---------- */
+.suggest {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  animation: suggest-in 0.16s var(--ease);
+}
+
+@keyframes suggest-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.suggestHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px 9px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  color: var(--faint);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.suggest ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.suggestItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  text-decoration: none;
+  transition: background var(--dur) var(--ease);
+}
+
+.suggestItem:hover,
+.suggestActive {
+  background: var(--panel-2);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.suggestActive {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.suggestTitle {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestSnippet {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.suggestAuthor {
+  color: var(--muted);
+}
+
+.hitWord {
+  margin-left: auto;
+  flex: 0 0 auto;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--hl-bg);
+  color: var(--hl-text);
+  font-size: 11px;
+}
+
+.suggestEmpty {
+  margin: 0;
+  padding: 20px 12px 24px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ---------- 结果页 ---------- */
+.resultBar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: -4px 0 16px;
+}
+
+.resultChip {
+  padding: 3px 11px;
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.resultMeta {
+  font-size: 12px;
+  color: var(--faint);
 }
 
 .pager {
@@ -20,5 +213,23 @@
   align-items: center;
   justify-content: center;
   gap: 16px;
-  margin-top: 20px;
+  margin-top: 24px;
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  .search {
+    flex: 1 1 100%;
+  }
+  .suggest {
+    max-height: 320px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .suggest {
+    animation: none;
+  }
 }

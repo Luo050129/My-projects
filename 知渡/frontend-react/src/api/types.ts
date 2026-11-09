@@ -54,6 +54,18 @@ export interface Post {
   createTime: string
 }
 
+/** 搜索联想项：GET /search/suggest，按点赞数降序 */
+export interface PostSuggestion {
+  id: number
+  title: string
+  /** 命中词附近的上下文，来自摘要 / 正文 / 标签 */
+  snippet: string
+  authorName: string
+  likeCount: number
+  commentCount: number
+  matchedWord: string
+}
+
 /** CommentVO */
 export interface Comment {
   id: number

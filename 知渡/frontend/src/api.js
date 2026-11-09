@@ -74,6 +74,13 @@ export const fetchMe = () => request('/user/me')
 export const fetchUsers = (current = 1, size = 10) =>
   request(`/user/page?current=${current}&size=${size}`)
 
+// ---------- 搜索 ----------
+// 输入联想：多词包含匹配，后端按点赞数降序返回
+export const fetchSuggestions = (keyword, limit = 8) => {
+  const q = new URLSearchParams({ keyword, limit })
+  return request(`/search/suggest?${q.toString()}`)
+}
+
 // ---------- 帖子 ----------
 export const fetchPosts = (current = 1, size = 10, keyword = '') => {
   const q = new URLSearchParams({ current, size })

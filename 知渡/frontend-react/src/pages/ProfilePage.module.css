@@ -14,8 +14,8 @@
   justify-content: center;
   font-size: 26px;
   font-weight: 700;
-  color: #fff;
-  background: linear-gradient(135deg, #4f8cff, #7b5cff);
+  color: var(--on-fill);
+  background: linear-gradient(135deg, var(--accent), var(--purple));
   user-select: none;
 }
 
@@ -36,8 +36,8 @@
 }
 
 .roleTag {
-  border-color: #4a3a6a;
-  color: #b79cff;
+  border-color: var(--purple-line);
+  color: var(--purple-ink);
 }
 
 .stats {
@@ -118,7 +118,7 @@
   top: 12px;
   right: 14px;
   z-index: 1;
-  border-color: #5a4a2a;
+  border-color: var(--warn-line);
   color: var(--warn);
   background: var(--panel);
 }
@@ -170,8 +170,8 @@
   justify-content: center;
   font-size: 17px;
   font-weight: 600;
-  color: #fff;
-  background: linear-gradient(135deg, #3e4a63, #586a8c);
+  color: var(--on-fill);
+  background: linear-gradient(135deg, var(--panel-3), var(--line-strong));
   user-select: none;
 }
 

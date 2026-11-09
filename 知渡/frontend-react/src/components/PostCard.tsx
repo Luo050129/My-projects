@@ -1,13 +1,16 @@
 import { Link } from 'react-router-dom'
 import type { Post } from '../api/types'
 import { formatTime } from '../utils/format'
+import { Highlight } from '../utils/highlight'
 import styles from './PostCard.module.css'
 
 /**
  * 列表项。抽成独立组件后，列表页只剩"取数 + 分页"，
  * 卡片本身的展示逻辑可以单独改、单独测。
+ *
+ * highlightWords 由搜索结果页传入（个人中心等页面不传，标题照常渲染）。
  */
-export function PostCard({ post }: { post: Post }) {
+export function PostCard({ post, highlightWords = [] }: { post: Post; highlightWords?: string[] }) {
   return (
     <article className={`panel ${styles.card}`}>
       {post.coverImage && (
@@ -17,11 +20,15 @@ export function PostCard({ post }: { post: Post }) {
       )}
       <div className={styles.main}>
         <Link to={`/posts/${post.id}`} className={styles.title}>
-          {post.title}
+          <Highlight text={post.title} words={highlightWords} />
         </Link>
-        {post.summary && <p className={styles.summary}>{post.summary}</p>}
+        {post.summary && (
+          <p className={styles.summary}>
+            <Highlight text={post.summary} words={highlightWords} />
+          </p>
+        )}
         <div className={styles.meta}>
-          <span>{post.authorName}</span>
+          <span className={styles.author}>{post.authorName}</span>
           <span className={styles.dot}>·</span>
           <span>{formatTime(post.createTime)}</span>
           <span className={styles.dot}>·</span>

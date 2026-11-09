@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="title desc">
+  <title id="title">知渡</title>
+  <desc id="desc">蓝色帖子卡片上有白色文字行与一条珊瑚色命中高亮，右下角是琥珀色放大镜，寓意在帖子中搜索并高亮命中内容。</desc>
+  <defs>
+    <linearGradient id="zd-card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6BA3FF"/>
+      <stop offset="1" stop-color="#3F7BEF"/>
+    </linearGradient>
+    <linearGradient id="zd-lens" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFD873"/>
+      <stop offset="1" stop-color="#F5B83D"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 深色圆角底：保证浅色标签栏与深色界面里都有清晰边界 -->
+  <rect width="64" height="64" rx="15" fill="#11151C"/>
+
+  <!-- 帖子卡片 -->
+  <rect x="9" y="9" width="34" height="34" rx="7" fill="url(#zd-card)"/>
+  <rect x="15" y="17" width="21" height="4" rx="2" fill="#FFFFFF" opacity="0.95"/>
+  <rect x="15" y="25" width="14" height="4" rx="2" fill="#FFFFFF" opacity="0.74"/>
+  <!-- 命中片段高亮 -->
+  <rect x="15" y="33" width="19" height="4.4" rx="2.2" fill="#FF7A6B"/>
+
+  <!-- 放大镜：先铺底色遮住卡片右下角，再画环与柄 -->
+  <circle cx="43" cy="43" r="12" fill="#11151C"/>
+  <circle cx="43" cy="43" r="9.4" fill="none" stroke="url(#zd-lens)" stroke-width="4.6"/>
+  <path d="M50.8 50.8 L57.5 57.5" fill="none" stroke="url(#zd-lens)" stroke-width="5.4" stroke-linecap="round"/>
+</svg>
